@@ -17,6 +17,7 @@ fields are max 500 characters.
 | Scope assignments, catalogue, rules, governance, ledger, clock | workflow | edge reads scope via internal API (cached 60 s) |
 | Evidence objects + metadata | edge (evidence locker) | workflow references evidenceIds |
 | Idempotency records, sessions, rate-limit counters | edge (database `edge_<profile>`) | — |
+| Purge list (`PurgeListEntry`) | edge | backup sidecar reads |
 | In-app and email notifications (`notifications` collection) | workflow | — |
 | SMS stand-in records (`sms_messages`: consent, receipts), analytics outbox | adapters | workflow emits events |
 

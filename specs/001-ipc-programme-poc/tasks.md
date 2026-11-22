@@ -88,7 +88,7 @@ its own once Phase 2 is done.
   - the workflow collections and indexes from data-model.md "Indexes"
   - an app DB role with insert+find only on `ledger` (research T12)
   - a reversible down migration
-- [ ] T029 Write migrate-mongo setup in `services/edge/migrations/` for the edge-owned collections (sessions, idempotency with a 7-day TTL, EvidenceItem, DeviceQueueStatus): their indexes, plus reversible down migrations (Constitution II, XIII)
+- [ ] T029 Write migrate-mongo setup in `services/edge/migrations/` for the edge-owned collections (sessions, idempotency with a 7-day TTL, EvidenceItem, DeviceQueueStatus, PurgeListEntry with a unique objectKey): their indexes, plus reversible down migrations (Constitution II, XIII)
 - [ ] T030 Write the ledger, test-first:
   - first the unit tests in `services/workflow/tests/domain/ledger.test.ts` (chain, canonical JSON, first broken seq)
   - then `services/workflow/src/ledger/{ledger.repository.ts,ledger.service.ts}`
@@ -233,7 +233,7 @@ its own once Phase 2 is done.
   - submit: check the declaration, check that every referenced evidenceId is confirmed, then call samiksha
   - store the AssessmentContext through workflow `internalUpsertAssessmentContext`, with cycle, assessor type and baseline flag
   - `setAssessmentBaseline` lets the officer change the baseline link with a reason (FR-010 edge case)
-- [ ] T079 [US2] Write `services/workflow/src/services/assessment.service.ts`. It records the AssessmentContext, sets `isBaselineForCycle` and the `baselineOfId` link, and sets the release state to "held" for external assessors It also serves `internalUpsertAssessmentContext` from `routes/internal/assessment-context.routes.ts`: an idempotent upsert on `elevateSubmissionId` whose status only moves forward.
+- [ ] T079 [US2] Write `services/workflow/src/services/assessment.service.ts`. It records the AssessmentContext, sets `isBaselineForCycle` and the `baselineOfId` link, and sets the release state to "held" for external assessors. It also serves `internalUpsertAssessmentContext` from `routes/internal/assessment-context.routes.ts`: an idempotent upsert on `elevateSubmissionId` whose status only moves forward.
 - [ ] T080 [US2] Build `apps/field/src/features/assessment/`: WardList, download for offline, a sectioned Form for the ward type, Notes and observations, PhotoCapture per question, the Declaration, a Submit queued to the outbox, and per-item outbox status
 - [ ] T081 [US2] Write the E2E test `tests/e2e/us2-offline-assessment.spec.ts`:
   - go offline and complete with 3 photos, then come online
@@ -405,7 +405,7 @@ Write the tests first and confirm they fail. Then build in this order: domain, s
 
 ### Parallel opportunities
 
-- **Phase 1**: T002–T011 all run in parallel.
+- **Phase 1**: T002–T010 run in parallel; T011 runs after T007.
 - **Phase 2**: T012–T017 run in parallel, then T019–T024 in parallel, and T047–T048 in parallel with the backend work.
 - **US9**: T058–T063 run in parallel.
 - **US1**: T067–T070 run in parallel, and T074 runs alongside T071–T073.
