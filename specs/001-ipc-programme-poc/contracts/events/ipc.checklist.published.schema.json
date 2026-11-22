@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.checklist.published.schema.json",
+  "title": "ipc.checklist.published",
+  "description": "A checklist version was published; the previous version retires after the grace period (FR-005). Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.checklist.published"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "checklist_version"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checklistVersionId",
+        "checklistCode",
+        "version",
+        "contentHash",
+        "questionCount",
+        "questionCountsByRisk",
+        "sectionKeys",
+        "planTemplateVersion",
+        "previousVersionId",
+        "previousVersionGraceUntil",
+        "publishedAt"
+      ],
+      "properties": {
+        "checklistVersionId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "checklistCode": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "questionCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "questionCountsByRisk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "critical",
+            "high",
+            "normal"
+          ],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "normal": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "sectionKeys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "planTemplateVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "elevateSolutionId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "previousVersionId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/objectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previousVersionGraceUntil": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

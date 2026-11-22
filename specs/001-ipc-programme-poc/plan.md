@@ -63,7 +63,7 @@ mid-range mobile profile).
 a static secret header; the demo clock never shifts ELEVATE dates.
 
 **Scale/Scope**: pilot 15 hospitals / ~150 wards / 250 users / 7 roles; scale 150 / ~1,500 / 2,500
-(see Capacity). 9 user stories, ~30 screens, ~45 programme endpoints.
+(see Capacity). 9 user stories, ~30 screens, 91 API operations (84 public, 7 internal; see contracts/README.md).
 
 ## Constitution Check
 

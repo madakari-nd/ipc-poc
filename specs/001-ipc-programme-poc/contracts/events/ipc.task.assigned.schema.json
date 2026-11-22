@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.task.assigned.schema.json",
+  "title": "ipc.task.assigned",
+  "description": "A task got an owner: on plan approval, on revision, or by reassignment (state unchanged). Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.task.assigned"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "task"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "planId",
+        "wardId",
+        "facilityId",
+        "riskLevel",
+        "assignment",
+        "ownerUserId",
+        "previousOwnerUserId",
+        "state",
+        "dueAt",
+        "secondValidation"
+      ],
+      "properties": {
+        "taskId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "planId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "wardId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "facilityId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "normal"
+          ]
+        },
+        "assignment": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "reassigned",
+            "reopened",
+            "carried_over"
+          ]
+        },
+        "ownerUserId": {
+          "$ref": "#/$defs/userId"
+        },
+        "previousOwnerUserId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/userId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "ASSIGNED",
+            "IN_PROGRESS",
+            "EVIDENCE_SUBMITTED",
+            "CHANGES_REQUESTED",
+            "VERIFIED",
+            "PENDING_VALIDATION",
+            "CLOSED"
+          ]
+        },
+        "dueAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "secondValidation": {
+          "type": "boolean"
+        },
+        "supportRequestId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "reopenedFromTaskId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "carriedOverFromTaskId": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

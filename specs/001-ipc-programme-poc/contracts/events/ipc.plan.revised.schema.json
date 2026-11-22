@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.plan.revised.schema.json",
+  "title": "ipc.plan.revised",
+  "description": "A numbered plan revision was recorded (FR-017, FR-023). Free-text reason is not carried. Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.plan.revised"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "plan"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "wardId",
+        "facilityId",
+        "revision",
+        "source",
+        "changes"
+      ],
+      "properties": {
+        "planId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "wardId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "facilityId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "officer",
+            "mentor_outcome",
+            "carry_over"
+          ]
+        },
+        "supportRequestId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "taskId"
+            ],
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "add",
+                  "remove",
+                  "update"
+                ]
+              },
+              "taskId": {
+                "$ref": "#/$defs/objectId"
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

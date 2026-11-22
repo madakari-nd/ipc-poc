@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.task.escalated.schema.json",
+  "title": "ipc.task.escalated",
+  "description": "An escalation record was created by a rule or manually; owner and history unchanged (FR-020). Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.task.escalated"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "task"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "escalationId",
+        "taskId",
+        "planId",
+        "wardId",
+        "facilityId",
+        "riskLevel",
+        "ruleCode",
+        "level",
+        "targetRole",
+        "targetUserCount",
+        "vacantTargetFlag",
+        "ownerUserId",
+        "taskState",
+        "channels"
+      ],
+      "properties": {
+        "escalationId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "taskId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "planId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "wardId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "facilityId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "normal"
+          ]
+        },
+        "ruleCode": {
+          "type": "string",
+          "pattern": "^(R[0-9]{1,3}|manual)$"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "targetRole": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR"
+          ]
+        },
+        "targetUserCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vacantTargetFlag": {
+          "type": "boolean"
+        },
+        "ownerUserId": {
+          "$ref": "#/$defs/userId"
+        },
+        "taskState": {
+          "type": "string",
+          "enum": [
+            "ASSIGNED",
+            "IN_PROGRESS",
+            "EVIDENCE_SUBMITTED",
+            "CHANGES_REQUESTED",
+            "VERIFIED",
+            "PENDING_VALIDATION",
+            "CLOSED"
+          ]
+        },
+        "dueAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "overdueHours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rejectionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "inapp",
+              "email",
+              "sms"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

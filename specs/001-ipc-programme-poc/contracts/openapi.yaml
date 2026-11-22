@@ -1,0 +1,4473 @@
+openapi: 3.1.0
+info:
+  title: IPC Programme POC API
+  version: 1.0.0
+  summary: Programme Edge public API (/ipc/v1) and private workflow API (/internal) for the IPC programme on ELEVATE.
+  description: |
+    Contract-first definition (Constitution Principle V) for the IPC Programme POC.
+
+    * **Public** operations live under `/ipc/v1` on the Programme Edge, the only public entry point
+      (Caddy TLS :443). Root `/healthz`, `/readyz`, `/dependencies` are the Edge's own health routes.
+    * **Private** operations live under `/internal` on the workflow service, reachable only on the
+      private compose network. They are tagged `internal` and are never routed by the Edge (US9 AS7).
+      The Edge forwards governance calls to workflow with the same request/response shapes, carrying
+      the acting user in a service JWT; those mirrored routes are not repeated here.
+
+    Conventions (details in `contracts/README.md`):
+    * Browser writes: session cookie `ipc_sid` (httpOnly, Secure, SameSite=Strict) **and** `X-CSRF-Token`.
+    * Every write (POST/PUT/PATCH/DELETE) carries `Idempotency-Key` (UUID, kept 7 days per user). A replay
+      returns the stored response with `Idempotent-Replayed: true`; the same key with a different body is
+      refused with 422 `IDEMPOTENCY_KEY_REUSED`. Auth endpoints (login, OTP) are the only exception.
+    * Writes on versioned resources carry `If-Match: "<v>"`. A stale `v` gets 409 `VERSION_CONFLICT`
+      whose body carries the current resource (`current`) for the differences view (FR-016).
+    * Errors are RFC 9457 `application/problem+json` with a stable `code` and `correlationId`.
+    * Scope is always derived on the server; any scope, facility or role claimed in a request body is
+      ignored (FR-028). An id that does not exist or is out of scope returns 403 `SCOPE_DENIED`, so
+      existence is not disclosed, and the attempt is written to the ledger.
+    * Free text is at most 500 characters. Lists are cursor-paginated (`limit` 1-100, default 25).
+    * No patient data field exists anywhere in this contract (FR-032).
+
+    Extensions: `x-roles` lists the roles allowed (scope still applies); `x-requirements` lists the
+    FR/US ids the operation serves.
+  license:
+    name: Proprietary (POC)
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://ipc.localhost
+    description: Programme Edge (public, TLS). Serves /ipc/v1 and the Edge health routes.
+  - url: http://workflow:8080
+    description: IPC workflow service (private network only). Serves /internal.
+security:
+  - sessionCookie: []
+tags:
+  - name: auth
+    description: Sign-in through ELEVATE's own login, session and current user.
+  - name: home
+    description: Role home ("what needs me now").
+  - name: admin
+    description: Programme setup - programme, cycles, imports, scopes, risk defaults, escalation rules.
+  - name: catalogue
+    description: Checklist catalogue (versions are immutable once published).
+  - name: demo
+    description: Demo clock and on-demand sweep (demo mode only).
+  - name: assessments
+    description: Ward assessments, form bundles, submission, baseline, release, comparison and trend.
+  - name: evidence
+    description: Evidence locker (MinIO) - intents, confirmation, short-lived links, patient-media deletion.
+  - name: plans
+    description: Improvement plans, approval and revisions.
+  - name: tasks
+    description: Task state machine, decisions and history.
+  - name: escalations
+    description: Escalation records and manual escalation.
+  - name: support
+    description: Expert support requests with ELEVATE mentoring.
+  - name: oversight
+    description: District and state oversight read models.
+  - name: notifications
+    description: In-app notifications and SMS consent.
+  - name: devices
+    description: Field-device queue status telemetry.
+  - name: ledger
+    description: Tamper-evident audit ledger.
+  - name: health
+    description: Liveness, readiness and dependency status.
+  - name: internal
+    description: Private workflow API - reachable only on the private network, never through the Edge.
+
+paths:
+  # ---------------------------------------------------------------- auth
+  /ipc/v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Sign in with ELEVATE identifier and password
+      description: |
+        Calls ELEVATE user-service login, stores ELEVATE tokens encrypted server-side and sets the
+        `ipc_sid` cookie. If ELEVATE requires OTP for the account (admin roles), returns 202 with an
+        OTP challenge instead. Exempt from Idempotency-Key and CSRF (no session yet).
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: [FR-033, FR-034, US9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200':
+          description: Signed in; session cookie set.
+          headers:
+            Set-Cookie: {$ref: '#/components/headers/SetSessionCookie'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '202':
+          description: OTP required to complete sign-in.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OtpChallenge'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/auth/otp:
+    post:
+      tags: [auth]
+      operationId: requestOtp
+      summary: Request an OTP through ELEVATE
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: [FR-033, US9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OtpRequest'}
+      responses:
+        '202':
+          description: OTP sent if the identifier is known (response does not disclose which).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OtpChallenge'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/auth/otp/verification:
+    post:
+      tags: [auth]
+      operationId: verifyOtp
+      summary: Verify an OTP and start the session
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: [FR-033, US9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OtpVerifyRequest'}
+      responses:
+        '200':
+          description: Signed in; session cookie set.
+          headers:
+            Set-Cookie: {$ref: '#/components/headers/SetSessionCookie'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session and revoke ELEVATE tokens
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-033]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Session ended; cookie cleared.
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: Current user, roles, server-derived scope and CSRF token
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-003, FR-028, FR-033, FR-035, FR-036, US9]
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Me'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/me/home:
+    get:
+      tags: [home]
+      operationId: getHome
+      summary: What needs me now (role home)
+      description: Cards limited to actions the active role may take, counted within the server-derived scope.
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-036, US1, US2, US3, US4, US5, US6, US7, US8]
+      responses:
+        '200':
+          description: Home cards.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HomeSummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/me/sms-consent:
+    put:
+      tags: [notifications]
+      operationId: setSmsConsent
+      summary: Give or withdraw consent for the SMS stand-in channel
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-021, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SmsConsentRequest'}
+      responses:
+        '200':
+          description: Consent recorded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SmsConsent'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/users:
+    get:
+      tags: [admin]
+      operationId: listUsers
+      summary: People picker - users in scope (for owners, mentors' proposed owners, scopes)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR]
+      x-requirements: [FR-003, FR-012, FR-013, US3, US4]
+      parameters:
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: facilityId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/Role'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Users in scope.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/UserSummary'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- admin
+  /ipc/v1/admin/programme:
+    get:
+      tags: [admin]
+      operationId: getProgramme
+      summary: Programme settings
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-001, FR-035, US1]
+      responses:
+        '200':
+          description: Programme.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Programme'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: [admin]
+      operationId: updateProgramme
+      summary: Update programme name or languages
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-001, FR-031, FR-035, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProgrammeUpdate'}
+      responses:
+        '200':
+          description: Updated programme.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Programme'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/facilities:
+    get:
+      tags: [admin]
+      operationId: listFacilities
+      summary: Hierarchy - districts, hospitals and their ward register (scoped)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-001, FR-018a, FR-028, US1, US6, US9]
+      parameters:
+        - {name: districtCode, in: query, schema: {type: string, maxLength: 32}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/FacilityStatus'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Facilities with wards, limited to scope (a mentor sees only facilities with an accepted support request).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Facility'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/cycles:
+    get:
+      tags: [admin]
+      operationId: listCycles
+      summary: Assessment cycles
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-004, US1, US7]
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/CycleStatus'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Cycles.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Cycle'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/cycles:
+    post:
+      tags: [admin]
+      operationId: createCycle
+      summary: Create an assessment cycle with target dates
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-004, FR-018a, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CycleCreate'}
+      responses:
+        '201':
+          description: Cycle created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+            Location: {$ref: '#/components/headers/Location'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Cycle'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/admin/cycles/{cycleId}:
+    parameters:
+      - $ref: '#/components/parameters/CycleId'
+    patch:
+      tags: [admin]
+      operationId: updateCycle
+      summary: Update cycle dates or status (planned, active, closed)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-004, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CycleUpdate'}
+      responses:
+        '200':
+          description: Updated cycle.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Cycle'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/imports:
+    post:
+      tags: [admin]
+      operationId: createImport
+      summary: Upload a facility-master or staff (HR) file for import into ELEVATE
+      description: |
+        Starts an asynchronous import job run by the adapters service. Facility rows create or update
+        ELEVATE entities (facility code = externalId) and the ward register; HR rows create or update
+        ELEVATE users and programme scopes, and users marked as left are deactivated, their scope ends
+        and their open tasks appear in the supervisor's "needs reassignment" view.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-001, FR-002, FR-003, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/ImportUpload'}
+      responses:
+        '202':
+          description: Import job accepted.
+          headers:
+            Location: {$ref: '#/components/headers/Location'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportJob'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/admin/imports/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [admin]
+      operationId: getImport
+      summary: Import job status, counts and row errors
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-002, US1]
+      responses:
+        '200':
+          description: Import job.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportJob'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/scope-assignments:
+    get:
+      tags: [admin]
+      operationId: listScopeAssignments
+      summary: Role and scope assignments
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-003, US1, US9]
+      parameters:
+        - {name: userId, in: query, schema: {$ref: '#/components/schemas/UserId'}}
+        - {name: role, in: query, schema: {$ref: '#/components/schemas/Role'}}
+        - {name: activeOn, in: query, description: Only assignments valid at this instant., schema: {type: string, format: date-time}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Assignments.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/ScopeAssignment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: [admin]
+      operationId: createScopeAssignment
+      summary: Assign a role and scope with validity dates
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-003, FR-028, FR-031, US1, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScopeAssignmentCreate'}
+      responses:
+        '201':
+          description: Assignment created (ledger `scope.changed`).
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScopeAssignment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/scope-assignments/{assignmentId}:
+    parameters:
+      - $ref: '#/components/parameters/AssignmentId'
+    patch:
+      tags: [admin]
+      operationId: updateScopeAssignment
+      summary: Change or end a scope assignment
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-003, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScopeAssignmentUpdate'}
+      responses:
+        '200':
+          description: Updated assignment.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScopeAssignment'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- catalogue
+  /ipc/v1/checklists:
+    get:
+      tags: [catalogue]
+      operationId: listChecklistVersions
+      summary: Checklist versions (draft versions visible to STATE_ADMIN only)
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-005, US1]
+      parameters:
+        - {name: checklistCode, in: query, schema: {type: string, maxLength: 32}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/ChecklistStatus'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/ChecklistVersion'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/checklists/{checklistVersionId}:
+    parameters:
+      - $ref: '#/components/parameters/ChecklistVersionId'
+    get:
+      tags: [catalogue]
+      operationId: getChecklistVersion
+      summary: One checklist version with sections and questions (readable forever, also when retired)
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-005, US1, US7]
+      responses:
+        '200':
+          description: Checklist version.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChecklistVersion'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/checklists:
+    post:
+      tags: [catalogue]
+      operationId: createChecklistDraft
+      summary: Create a draft checklist version (optionally based on a published version)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-005, FR-006, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChecklistDraftCreate'}
+      responses:
+        '201':
+          description: Draft created with the next version number.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+            Location: {$ref: '#/components/headers/Location'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChecklistVersion'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/checklists/{checklistVersionId}:
+    parameters:
+      - $ref: '#/components/parameters/ChecklistVersionId'
+    patch:
+      tags: [catalogue]
+      operationId: updateChecklistDraft
+      summary: Edit a draft checklist version (published or retired versions are refused)
+      description: Any write to a published or retired version returns 409 `CHECKLIST_PUBLISHED` and the attempt is recorded in the ledger (US1 AS3).
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-005, FR-006, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChecklistDraftUpdate'}
+      responses:
+        '200':
+          description: Updated draft.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChecklistVersion'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/checklists/{checklistVersionId}/publication:
+    parameters:
+      - $ref: '#/components/parameters/ChecklistVersionId'
+    post:
+      tags: [catalogue]
+      operationId: publishChecklistVersion
+      summary: Publish draft v(n+1); v(n) is retired after a 7-day grace period
+      description: Computes `contentHash`, creates/links the ELEVATE observation solution and plan template, makes the version immutable and emits `ipc.checklist.published`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-005, FR-006, FR-027, FR-031, US1, US2]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Published version.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChecklistVersion'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/admin/risk-defaults:
+    get:
+      tags: [admin]
+      operationId: listRiskDefaults
+      summary: Risk defaults per level (due days, evidence rule, second validation)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER]
+      x-requirements: [FR-006, US1]
+      responses:
+        '200':
+          description: One entry per risk level.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 3
+                    items: {$ref: '#/components/schemas/RiskDefault'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/risk-defaults/{riskLevel}:
+    parameters:
+      - name: riskLevel
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/RiskLevel'}
+    put:
+      tags: [admin]
+      operationId: setRiskDefault
+      summary: Set the default for one risk level (applies to findings from the next assessment)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-006, FR-031, US1]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RiskDefaultUpdate'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RiskDefault'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/escalation-rules:
+    get:
+      tags: [admin]
+      operationId: listEscalationRules
+      summary: Escalation rules (seeded R1, R2, R3 per proposal A11)
+      x-roles: [STATE_ADMIN, DISTRICT_QM]
+      x-requirements: [FR-020, US5]
+      responses:
+        '200':
+          description: Rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/EscalationRule'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: [admin]
+      operationId: createEscalationRule
+      summary: Create an escalation rule
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-020, FR-031, US1, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EscalationRuleInput'}
+      responses:
+        '201':
+          description: Rule created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EscalationRule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/escalation-rules/{ruleCode}:
+    parameters:
+      - $ref: '#/components/parameters/RuleCode'
+    patch:
+      tags: [admin]
+      operationId: updateEscalationRule
+      summary: Change or deactivate an escalation rule
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-020, FR-031, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EscalationRuleUpdate'}
+      responses:
+        '200':
+          description: Updated rule.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EscalationRule'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- demo
+  /ipc/v1/demo/clock:
+    get:
+      tags: [demo]
+      operationId: getDemoClock
+      summary: Programme clock (drives the "not real time" banner)
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-038, US5, US7]
+      responses:
+        '200':
+          description: Clock.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemoClock'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    put:
+      tags: [demo]
+      operationId: setDemoClock
+      summary: Shift programme time (demo mode, dev/uat profile only)
+      description: ELEVATE dates are never shifted. Ledger `clock.shifted`. Outside demo mode returns 403 `DEMO_MODE_DISABLED`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-038, FR-031, US5, US7]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DemoClockSet'}
+      responses:
+        '200':
+          description: Clock shifted.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemoClock'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/demo/clock/reset:
+    post:
+      tags: [demo]
+      operationId: resetDemoClock
+      summary: Return the programme clock to real time
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-038, FR-031]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Clock back to real time.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DemoClock'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/demo/escalation-sweep:
+    post:
+      tags: [demo]
+      operationId: runEscalationSweepNow
+      summary: Run the escalation sweep now (demo mode)
+      description: The Edge forwards to `POST /internal/escalations/run-now`. Idempotent per (task, rule, level).
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-020, FR-038, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Sweep result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SweepResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+
+  # ---------------------------------------------------------------- assessments
+  /ipc/v1/assessments:
+    get:
+      tags: [assessments]
+      operationId: listAssessments
+      summary: Assessments in scope; view=assigned lists the wards the caller must assess
+      description: Held external results (`releaseState=held`) are omitted for hospital users until released (FR-024a).
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-007, FR-010, FR-024a, FR-028, US2, US7, US9]
+      parameters:
+        - name: view
+          in: query
+          schema: {type: string, enum: [assigned, all], default: all}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: cycleId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/AssessmentStatus'}}
+        - {name: releaseState, in: query, schema: {$ref: '#/components/schemas/ReleaseState'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Assessments.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/AssessmentContext'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/assessments/{assessmentId}:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    get:
+      tags: [assessments]
+      operationId: getAssessment
+      summary: One assessment with scores, version, baseline link and declaration
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-005, FR-010, FR-024a, FR-028, US2, US7, US9]
+      responses:
+        '200':
+          description: Assessment.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/assessments/{assessmentId}/form-bundle:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    get:
+      tags: [assessments]
+      operationId: getFormBundle
+      summary: Download the offline form bundle (checklist version, ward-type sections, bundle hash)
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR]
+      x-requirements: [FR-005, FR-007, FR-010, US2]
+      responses:
+        '200':
+          description: Bundle for offline use; ETag is the bundle hash.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FormBundle'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/assessments/{assessmentId}/submission:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    post:
+      tags: [assessments]
+      operationId: submitAssessment
+      summary: Submit answers with the no-patient-data declaration
+      description: |
+        Answers reference confirmed evidence ids only (photos sync first). The Edge checks scope and
+        ownership and writes to samiksha with the caller's ELEVATE token. Without `declaration.accepted`
+        → 422 `DECLARATION_REQUIRED`. Draft built on a version retired past its grace period → 422
+        `CHECKLIST_VERSION_RETIRED` (restart on the new version). Scope changed since download → 403 `SCOPE_DENIED`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR]
+      x-requirements: [FR-007, FR-008, FR-009, FR-010, FR-028, FR-030, FR-032, US2, US7, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssessmentSubmission'}
+      responses:
+        '202':
+          description: Submitted to ELEVATE; completion (scoring) arrives asynchronously.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/assessments/{assessmentId}/baseline:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    put:
+      tags: [assessments]
+      operationId: setAssessmentBaseline
+      summary: Change the baseline link with a reason (second assessment in a cycle)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER]
+      x-requirements: [FR-010, FR-024, FR-031, US7]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BaselineChange'}
+      responses:
+        '200':
+          description: Baseline link changed.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/assessments/{assessmentId}/release:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    post:
+      tags: [assessments]
+      operationId: releaseAssessment
+      summary: Release a held external-auditor result to the hospital
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [DISTRICT_QM]
+      x-requirements: [FR-024a, FR-027, FR-031, US7]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: {$ref: '#/components/schemas/FreeText'}
+      responses:
+        '200':
+          description: Released (ledger `assessment.released`, event `ipc.assessment.released`).
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/assessments/{assessmentId}/comparison:
+    parameters:
+      - $ref: '#/components/parameters/AssessmentId'
+    get:
+      tags: [assessments]
+      operationId: getAssessmentComparison
+      summary: Compare an assessment with its baseline, section by section
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-024, FR-024a, US7]
+      responses:
+        '200':
+          description: Comparison.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comparison'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/wards/{wardId}/trend:
+    parameters:
+      - $ref: '#/components/parameters/WardId'
+    get:
+      tags: [assessments]
+      operationId: getWardTrend
+      summary: Score trend for a ward across all cycles
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-024, FR-025, US7, US8]
+      responses:
+        '200':
+          description: Trend points.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Trend'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- evidence
+  /ipc/v1/evidence/intents:
+    post:
+      tags: [evidence]
+      operationId: createEvidenceIntent
+      summary: Declare a photo or file and get a signed upload URL (valid at most 5 minutes)
+      description: Same sha256 for the same link returns the existing item (no duplicate on retry).
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE]
+      x-requirements: [FR-008, FR-009, FR-028, FR-029, FR-030, US2, US4, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EvidenceIntentRequest'}
+      responses:
+        '201':
+          description: Intent created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EvidenceIntentResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/evidence/{evidenceId}/upload-url:
+    parameters:
+      - $ref: '#/components/parameters/EvidenceId'
+    post:
+      tags: [evidence]
+      operationId: renewEvidenceUploadUrl
+      summary: Issue a fresh signed upload URL when the previous one expired mid-upload
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE]
+      x-requirements: [FR-009, FR-029, US2]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: New upload URL.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SignedUrl'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/evidence/{evidenceId}/confirmation:
+    parameters:
+      - $ref: '#/components/parameters/EvidenceId'
+    post:
+      tags: [evidence]
+      operationId: confirmEvidence
+      summary: Confirm upload; server re-checks size, type and SHA-256
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE]
+      x-requirements: [FR-008, FR-009, FR-030, US2, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Confirmed evidence item.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EvidenceItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/evidence/{evidenceId}:
+    parameters:
+      - $ref: '#/components/parameters/EvidenceId'
+    get:
+      tags: [evidence]
+      operationId: getEvidence
+      summary: Evidence metadata (capture time, GPS or "GPS unavailable", uploader, fingerprint)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR]
+      x-requirements: [FR-008, FR-028, US2, US4, US9]
+      responses:
+        '200':
+          description: Metadata (no content).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EvidenceItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/evidence/{evidenceId}/download-link:
+    parameters:
+      - $ref: '#/components/parameters/EvidenceId'
+    get:
+      tags: [evidence]
+      operationId: getEvidenceDownloadLink
+      summary: Short-lived signed download URL (at most 300 s), issued after a scope check
+      description: Out-of-scope requests return 403 `SCOPE_DENIED` and are recorded (ledger `evidence.denied`) - security case V1.
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR]
+      x-requirements: [FR-028, FR-029, US4, US7, US9]
+      responses:
+        '200':
+          description: Signed URL.
+          headers:
+            Cache-Control:
+              description: Always `no-store`.
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SignedUrl'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/evidence/{evidenceId}/patient-data-deletion:
+    parameters:
+      - $ref: '#/components/parameters/EvidenceId'
+    post:
+      tags: [evidence]
+      operationId: deletePatientDataMedia
+      summary: Reviewer permanently deletes media that shows a patient (metadata and audit kept)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR, IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-031, FR-032, US4, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PatientDataDeletion'}
+      responses:
+        '200':
+          description: Content removed; state `deleted_patient_data`.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EvidenceItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+
+  # ---------------------------------------------------------------- plans
+  /ipc/v1/plans:
+    get:
+      tags: [plans]
+      operationId: listPlans
+      summary: Plans in scope; status=draft is the officer's draft queue
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-011, FR-012, FR-028, US3, US7, US9]
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/PlanStatus'}}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: facilityId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: cycleId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Plans.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Plan'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/plans/{planId}:
+    parameters:
+      - $ref: '#/components/parameters/PlanId'
+    get:
+      tags: [plans]
+      operationId: getPlan
+      summary: Plan with tasks (draft tasks for a draft), carried-over and unplanned findings
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-011, FR-012, FR-018, FR-019, FR-028, US3, US7, US9]
+      responses:
+        '200':
+          description: Plan detail.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanDetail'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    patch:
+      tags: [plans]
+      operationId: updateDraftPlan
+      summary: Edit a draft plan (owners, goals, milestones, dependencies, included tasks)
+      description: Only while `status=draft`; otherwise 409 `INVALID_TRANSITION` (use plan revisions).
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER]
+      x-requirements: [FR-012, FR-013, FR-016, US3]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DraftPlanUpdate'}
+      responses:
+        '200':
+          description: Updated draft.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanDetail'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/plans/{planId}/approval:
+    parameters:
+      - $ref: '#/components/parameters/PlanId'
+    post:
+      tags: [plans]
+      operationId: approvePlan
+      summary: Approve a draft plan; creates the ward's plan in ELEVATE project-service (revision 1)
+      description: |
+        Workflow writes the plan as the ward's programme service account using the cycle's plan
+        solution (FR-018a). Every task needs an owner (422 `VALIDATION_FAILED`). Emits
+        `ipc.plan.created` and `ipc.task.assigned` per task. ELEVATE down → 503 `ELEVATE_UNAVAILABLE`,
+        nothing half-written.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER]
+      x-requirements: [FR-012, FR-018a, FR-027, FR-031, US3]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Plan active.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanDetail'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/plans/{planId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/PlanId'
+    get:
+      tags: [plans]
+      operationId: listPlanRevisions
+      summary: Plan history - numbered revisions with actor, reason and changes
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-017, FR-018, FR-023, US3, US6, US7]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Revisions, newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/PlanRevision'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: [plans]
+      operationId: revisePlan
+      summary: Revise an active plan (add, remove or change tasks) with a reason
+      description: Closed tasks cannot be changed (409 `INVALID_TRANSITION`). Emits `ipc.plan.revised`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER]
+      x-requirements: [FR-015, FR-017, FR-027, FR-031, US3]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PlanRevisionRequest'}
+      responses:
+        '201':
+          description: Revision recorded; plan returned with new revision number.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanDetail'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+
+  # ---------------------------------------------------------------- tasks
+  /ipc/v1/tasks:
+    get:
+      tags: [tasks]
+      operationId: listTasks
+      summary: Task queues - mine, ward, review, validation, needs reassignment
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-013, FR-025, FR-028, US1, US4, US9]
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [mine, ward, review_queue, validation_queue, needs_reassignment, overdue]
+            default: mine
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: planId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: state, in: query, schema: {$ref: '#/components/schemas/TaskState'}}
+        - {name: riskLevel, in: query, schema: {$ref: '#/components/schemas/RiskLevel'}}
+        - {name: blocked, in: query, schema: {type: boolean}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Tasks.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Task'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      operationId: getTask
+      summary: One task with current evidence, decisions and escalations
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-013, FR-028, US4, US5, US7, US9]
+      responses:
+        '200':
+          description: Task.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Task'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/start:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: startTask
+      summary: ASSIGNED to IN_PROGRESS (owner; all dependencies closed)
+      description: An open dependency returns 409 `DEPENDENCY_OPEN` naming the blocking task(s) in `blockingTasks`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [FRONTLINE, WARD_SUPERVISOR]
+      x-requirements: [FR-013, FR-016, FR-030, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/evidence-submission:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: submitTaskEvidence
+      summary: Submit evidence (IN_PROGRESS or CHANGES_REQUESTED to EVIDENCE_SUBMITTED; owner)
+      description: Evidence must be confirmed and meet the task's evidence rule, else 422 `EVIDENCE_RULE_NOT_MET`. Emits `ipc.task.evidence_submitted`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [FRONTLINE, WARD_SUPERVISOR]
+      x-requirements: [FR-008, FR-009, FR-013, FR-016, FR-027, FR-030, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EvidenceSubmission'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/acceptance:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: acceptTask
+      summary: Supervisor accepts evidence (to CLOSED for normal, PENDING_VALIDATION for critical/high)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR]
+      x-requirements: [FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AcceptDecisionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/return:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: returnTask
+      summary: Supervisor returns evidence with a reason (to CHANGES_REQUESTED, rejectionCount+1)
+      description: Triggers rule evaluation on return (R3). Emits `ipc.task.decided`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR]
+      x-requirements: [FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReasonedDecisionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/validation:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: validateTask
+      summary: Second validation (PENDING_VALIDATION to CLOSED) with a reason
+      description: Emits `ipc.task.validated`; reconciliation marks the ELEVATE task completed.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReasonedDecisionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/validation-return:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: returnTaskFromValidation
+      summary: Validator returns (PENDING_VALIDATION to CHANGES_REQUESTED, rejectionCount+1)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReasonedDecisionRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/reassignment:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: reassignTask
+      summary: Supervisor reassigns the owner with a reason (state unchanged)
+      description: Emits `ipc.task.assigned`; history keeps the previous owner.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR]
+      x-requirements: [FR-002, FR-013, FR-016, FR-027, FR-031, US1, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReassignRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/blocked-flag:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    put:
+      tags: [tasks]
+      operationId: setTaskBlockedFlag
+      summary: Set or clear the blocked flag (reason, actor, time; not a state)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR]
+      x-requirements: [FR-013, FR-016, FR-031, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BlockedFlagRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/reopening:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [tasks]
+      operationId: reopenTask
+      summary: Reopen a CLOSED task by creating a new linked task (closed task unchanged)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER]
+      x-requirements: [FR-015, FR-017, FR-031, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReopenRequest'}
+      responses:
+        '201':
+          description: New task with `reopenedFromTaskId`; plan revision recorded.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+            Location: {$ref: '#/components/headers/Location'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Task'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/history:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      operationId: getTaskHistory
+      summary: Full task history - actor, role, time, reason, evidence fingerprints, escalations
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR]
+      x-requirements: [FR-013, FR-014, FR-031, US4, US5, US7, US9]
+      responses:
+        '200':
+          description: History, oldest first.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskHistory'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- escalations
+  /ipc/v1/escalations:
+    get:
+      tags: [escalations]
+      operationId: listEscalations
+      summary: Escalations targeting me or within my scope
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR]
+      x-requirements: [FR-020, FR-028, US5]
+      parameters:
+        - {name: taskId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: targetedToMe, in: query, schema: {type: boolean, default: false}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Escalations.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Escalation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/tasks/{taskId}/escalations:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [escalations]
+      operationId: raiseManualEscalation
+      summary: Raise a manual escalation with a reason (notifies the IPC officer; owner unchanged)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [WARD_SUPERVISOR]
+      x-requirements: [FR-020, FR-021, FR-027, FR-031, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ManualEscalationRequest'}
+      responses:
+        '201':
+          description: Escalation recorded (`ruleCode=manual`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Escalation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- support
+  /ipc/v1/support-requests:
+    get:
+      tags: [support]
+      operationId: listSupportRequests
+      summary: Support requests in scope (a mentor sees only requests addressed to them)
+      x-roles: [DISTRICT_QM, IPC_OFFICER, MENTOR, STATE_ADMIN]
+      x-requirements: [FR-022, FR-028, US6]
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/SupportRequestStatus'}}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Requests.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/SupportRequest'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: [support]
+      operationId: createSupportRequest
+      summary: Raise a support request for a ward problem (returns initial shortlist)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-022, FR-031, FR-032, US6]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SupportRequestCreate'}
+      responses:
+        '201':
+          description: Request created with shortlist.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportRequest'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/support-requests/{supportRequestId}/shortlist:
+    parameters:
+      - $ref: '#/components/parameters/SupportRequestId'
+    get:
+      tags: [support]
+      operationId: getMentorShortlist
+      summary: Ranked mentor shortlist (skill, then language, then an open slot within 14 programme days)
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-022, US6]
+      parameters:
+        - {name: refresh, in: query, description: Re-read mentors and availability from ELEVATE mentoring., schema: {type: boolean, default: false}}
+      responses:
+        '200':
+          description: Shortlist.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [supportRequestId, computedAt, items]
+                properties:
+                  supportRequestId: {$ref: '#/components/schemas/ObjectId'}
+                  computedAt: {$ref: '#/components/schemas/Timestamp'}
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ShortlistEntry'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/support-requests/{supportRequestId}/session-request:
+    parameters:
+      - $ref: '#/components/parameters/SupportRequestId'
+    post:
+      tags: [support]
+      operationId: requestMentorSession
+      summary: Request a session with the chosen mentor in ELEVATE mentoring (officer's own token)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-022, FR-031, US6]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SessionRequestCreate'}
+      responses:
+        '200':
+          description: Request sent; status `requested`.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportRequest'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /ipc/v1/support-requests/{supportRequestId}/outcome:
+    parameters:
+      - $ref: '#/components/parameters/SupportRequestId'
+    post:
+      tags: [support]
+      operationId: recordSupportOutcome
+      summary: Mentor marks the session held and records agreed actions (request must be accepted in ELEVATE)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [MENTOR]
+      x-requirements: [FR-022, FR-031, FR-032, US6]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SupportOutcome'}
+      responses:
+        '200':
+          description: Status `held`; agreed actions stored.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupportRequest'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/support-requests/{supportRequestId}/plan-actions:
+    parameters:
+      - $ref: '#/components/parameters/SupportRequestId'
+    post:
+      tags: [support]
+      operationId: addAgreedActionsToPlan
+      summary: Officer adds agreed actions to the ward plan as linked tasks with proposed owners
+      description: Creates a plan revision (`source=mentor_outcome`), tasks carry `supportRequestId`; request becomes `closed`. Emits `ipc.plan.revised` and `ipc.task.assigned`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, DISTRICT_QM]
+      x-requirements: [FR-017, FR-023, FR-027, FR-031, US6]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AgreedActionsToPlan'}
+      responses:
+        '201':
+          description: Plan revision created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlanRevision'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+
+  # ---------------------------------------------------------------- oversight
+  /ipc/v1/oversight/summary:
+    get:
+      tags: [oversight]
+      operationId: getOversightSummary
+      summary: Completion, open/overdue critical, repeated failures and exceptions per district/hospital
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER]
+      x-requirements: [FR-025, FR-028, US8, US9]
+      parameters:
+        - {name: cycleId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: districtCode, in: query, schema: {type: string, maxLength: 32}}
+      responses:
+        '200':
+          description: Summary limited to the viewer's scope.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OversightSummary'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/oversight/wards:
+    get:
+      tags: [oversight]
+      operationId: listOversightWards
+      summary: Ward table - assessment status, scores, open/overdue critical, repeated failures
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER]
+      x-requirements: [FR-025, FR-028, US8]
+      parameters:
+        - {name: cycleId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: districtCode, in: query, schema: {type: string, maxLength: 32}}
+        - {name: facilityId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Rows.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/OversightWardRow'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/oversight/data-quality-exceptions:
+    get:
+      tags: [oversight]
+      operationId: listDataQualityExceptions
+      summary: Data-quality exceptions (GPS, skew, late upload, duplicate photo, no baseline, stale device)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR]
+      x-requirements: [FR-026, FR-037, US2, US8]
+      parameters:
+        - {name: kind, in: query, schema: {$ref: '#/components/schemas/DataQualityExceptionKind'}}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: facilityId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Exceptions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/DataQualityException'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- notifications
+  /ipc/v1/notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: My notifications (in-app, plus email/SMS delivery status)
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-021, US5]
+      parameters:
+        - {name: unread, in: query, schema: {type: boolean}}
+        - {name: channel, in: query, schema: {$ref: '#/components/schemas/Channel'}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Notifications, newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items, unreadCount]
+                    properties:
+                      unreadCount: {type: integer, minimum: 0}
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Notification'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/NotificationId'
+    post:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark an in-app notification as read
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-021, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Notification marked read.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- devices
+  /ipc/v1/devices/{deviceId}/queue-status:
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    put:
+      tags: [devices]
+      operationId: reportDeviceQueueStatus
+      summary: Field app reports its outbox status when online
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [FRONTLINE, WARD_SUPERVISOR, IPC_OFFICER, EXTERNAL_AUDITOR]
+      x-requirements: [FR-026, FR-037, US2, US4]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeviceQueueStatusReport'}
+      responses:
+        '200':
+          description: Stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DeviceQueueStatus'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- ledger
+  /ipc/v1/ledger/{subjectType}/{subjectId}:
+    parameters:
+      - name: subjectType
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/LedgerSubjectType'}
+      - name: subjectId
+        in: path
+        required: true
+        schema: {type: string, maxLength: 64}
+    get:
+      tags: [ledger]
+      operationId: getEntityLedger
+      summary: Ledger records for one entity (scope-checked on the entity)
+      x-roles: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR]
+      x-requirements: [FR-019, FR-024a, FR-031, US1, US7, US9]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Records ordered by seq.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/LedgerRecord'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/ledger/verification:
+    get:
+      tags: [ledger]
+      operationId: verifyLedger
+      summary: Recompute the hash chain and report the first broken seq
+      x-roles: [STATE_ADMIN]
+      x-requirements: [FR-031, US9]
+      parameters:
+        - {name: fromSeq, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200':
+          description: Verification result (also when broken - see `ok`).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LedgerVerification'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- edge health
+  /healthz:
+    get:
+      tags: [health]
+      operationId: edgeHealthz
+      summary: Edge liveness
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: [FR-034]
+      responses:
+        '200':
+          description: Alive.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /readyz:
+    get:
+      tags: [health]
+      operationId: edgeReadyz
+      summary: Edge readiness (own stores only; an ELEVATE outage does not fail readiness)
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: [FR-034]
+      responses:
+        '200':
+          description: Ready.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /dependencies:
+    get:
+      tags: [health]
+      operationId: edgeDependencies
+      summary: Status of ELEVATE services and stores, used to say which function is unavailable
+      x-roles: [ANY_AUTHENTICATED]
+      x-requirements: [FR-036]
+      responses:
+        '200':
+          description: Dependency report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DependencyReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+
+  # ---------------------------------------------------------------- internal (private network)
+  /internal/scopes/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/UserId'}
+    get:
+      tags: [internal]
+      operationId: internalGetEffectiveScope
+      summary: Effective scope assignments for a user (Edge caches 60 s)
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-003, FR-028, US9]
+      responses:
+        '200':
+          description: Active assignments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, assignments, resolvedAt]
+                properties:
+                  userId: {$ref: '#/components/schemas/UserId'}
+                  resolvedAt: {$ref: '#/components/schemas/Timestamp'}
+                  mentorFacilityIds:
+                    type: array
+                    description: For MENTOR, facilities with an accepted support request.
+                    items: {$ref: '#/components/schemas/ObjectId'}
+                  assignments:
+                    type: array
+                    items: {$ref: '#/components/schemas/ScopeAssignment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /internal/escalations/sweep:
+    post:
+      tags: [internal]
+      operationId: internalEscalationSweep
+      summary: Hourly escalation sweep called by the ELEVATE scheduler
+      description: Authenticated by the static `X-Scheduler-Secret` header (security case V2). Idempotent on (task, rule, level).
+      security:
+        - schedulerSecret: []
+      x-roles: [SCHEDULER]
+      x-requirements: [FR-020, FR-021, FR-027, FR-034, US5, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                jobRunId: {type: string, maxLength: 64}
+      responses:
+        '200':
+          description: Sweep result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SweepResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/escalations/run-now:
+    post:
+      tags: [internal]
+      operationId: internalEscalationRunNow
+      summary: Run the sweep now (demo mode; forwarded by the Edge for STATE_ADMIN)
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-020, FR-038, US5]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Sweep result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SweepResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/reconciliation/run:
+    post:
+      tags: [internal]
+      operationId: internalRunReconciliation
+      summary: One-way reconciliation of programme task state into ELEVATE project-service
+      description: Every correction is written to the ledger (`reconcile.corrected`). Normally runs on a timer.
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-018a, FR-019, FR-031]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                planIds:
+                  type: array
+                  maxItems: 100
+                  items: {$ref: '#/components/schemas/ObjectId'}
+      responses:
+        '200':
+          description: Reconciliation result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReconciliationResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/healthz:
+    get:
+      tags: [internal, health]
+      operationId: workflowHealthz
+      summary: Workflow liveness
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: []
+      responses:
+        '200':
+          description: Alive.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/readyz:
+    get:
+      tags: [internal, health]
+      operationId: workflowReadyz
+      summary: Workflow readiness (Mongo and Kafka only)
+      security: []
+      x-roles: [PUBLIC]
+      x-requirements: []
+      responses:
+        '200':
+          description: Ready.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Health'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/dependencies:
+    get:
+      tags: [internal, health]
+      operationId: workflowDependencies
+      summary: Workflow view of ELEVATE dependencies (display and alerts)
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: []
+      responses:
+        '200':
+          description: Dependency report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DependencyReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: ipc_sid
+      description: httpOnly, Secure, SameSite=Strict session cookie set by login. Idle timeout 30 min (officer web); field device session up to 7 days with refresh.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Double-submit token from `GET /ipc/v1/me` or the login response. Required on every browser write.
+    serviceJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived service JWT (edge→workflow, adapters→workflow) carrying `sub` (service) and `act` (acting user id and role).
+    schedulerSecret:
+      type: apiKey
+      in: header
+      name: X-Scheduler-Secret
+      description: Static secret configured in the ELEVATE scheduler job; only for the escalation sweep.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated UUID, stored with user, method, path and request hash for 7 days. Replays return the stored response.
+      schema: {type: string, format: uuid}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: The resource version `v` the write was built on, as a strong ETag, e.g. `"7"`.
+      schema: {type: string, pattern: '^"[0-9]+"$'}
+      example: '"7"'
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from a previous page's `nextCursor`.
+      schema: {type: string, maxLength: 512}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+    CycleId:
+      name: cycleId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    AssignmentId:
+      name: assignmentId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    ChecklistVersionId:
+      name: checklistVersionId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    RuleCode:
+      name: ruleCode
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/RuleCode'}
+    AssessmentId:
+      name: assessmentId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    WardId:
+      name: wardId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    EvidenceId:
+      name: evidenceId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    PlanId:
+      name: planId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    SupportRequestId:
+      name: supportRequestId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ObjectId'}
+
+  headers:
+    ETag:
+      description: Current resource version `v` as a strong ETag, e.g. `"8"`.
+      schema: {type: string, pattern: '^"[0-9]+"$'}
+    Location:
+      description: URL of the created resource or job.
+      schema: {type: string, format: uri-reference}
+    SetSessionCookie:
+      description: '`ipc_sid=<opaque>; HttpOnly; Secure; SameSite=Strict; Path=/`'
+      schema: {type: string}
+    RetryAfter:
+      description: Seconds until the client may retry.
+      schema: {type: integer, minimum: 1}
+    CorrelationId:
+      description: Correlation id of the request (echoed or generated); also in the problem body.
+      schema: {type: string, maxLength: 64}
+
+  responses:
+    TaskOk:
+      description: Transition applied; task returned with new `v`.
+      headers:
+        ETag: {$ref: '#/components/headers/ETag'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Task'}
+    BadRequest:
+      description: Malformed request, missing Idempotency-Key or If-Match (`VALIDATION_FAILED`, `IDEMPOTENCY_KEY_REQUIRED`, `IF_MATCH_REQUIRED`).
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Unauthorized:
+      description: No valid session, service token or scheduler secret (`UNAUTHENTICATED`, `SESSION_EXPIRED`, `OTP_INVALID`).
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Forbidden:
+      description: Role, scope, ownership, CSRF or demo-mode refusal (`ROLE_DENIED`, `SCOPE_DENIED`, `NOT_OWNER`, `CSRF_INVALID`, `DEMO_MODE_DISABLED`). Recorded in the ledger.
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFound:
+      description: Unknown route or catalogue item (`NOT_FOUND`). Scoped resources answer 403 instead.
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    Conflict:
+      description: |
+        `VERSION_CONFLICT` (body carries `current` and `currentVersion` for the differences view),
+        `CHECKLIST_PUBLISHED`, `INVALID_TRANSITION`, `DEPENDENCY_OPEN` (with `blockingTasks`) or
+        `IDEMPOTENCY_KEY_IN_PROGRESS`.
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ConflictProblem'}
+    Unprocessable:
+      description: Semantically invalid (`VALIDATION_FAILED`, `IDEMPOTENCY_KEY_REUSED`, `DECLARATION_REQUIRED`, `EVIDENCE_RULE_NOT_MET`, `EVIDENCE_HASH_MISMATCH`, `CHECKLIST_VERSION_RETIRED`).
+      headers:
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    TooManyRequests:
+      description: Per-user rate limit exceeded (default 120 requests/minute) - `RATE_LIMITED`.
+      headers:
+        Retry-After: {$ref: '#/components/headers/RetryAfter'}
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ServiceUnavailable:
+      description: ELEVATE or storage unavailable (`ELEVATE_UNAVAILABLE`, `STORAGE_UNAVAILABLE`); nothing was half-written. Clients retry later.
+      headers:
+        Retry-After: {$ref: '#/components/headers/RetryAfter'}
+        X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+
+  schemas:
+    # ---------- primitives
+    ObjectId:
+      type: string
+      pattern: '^[a-f0-9]{24}$'
+    UserId:
+      type: string
+      description: ELEVATE user id.
+      maxLength: 64
+    ElevateRef:
+      type: string
+      description: Opaque ELEVATE identifier.
+      maxLength: 64
+    Timestamp:
+      type: string
+      format: date-time
+    Sha256:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+    FreeText:
+      type: string
+      maxLength: 500
+    Role:
+      type: string
+      enum: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR]
+    ScopeLevel:
+      type: string
+      enum: [state, district, facility, wards, own_tasks]
+    Language:
+      type: string
+      enum: [en, hi, kn]
+    Profile:
+      type: string
+      enum: [dev, test, uat, prod]
+    LocalizedText:
+      type: object
+      required: [en]
+      additionalProperties: false
+      properties:
+        en: {type: string, maxLength: 500}
+        hi: {type: string, maxLength: 500}
+        kn: {type: string, maxLength: 500}
+    RiskLevel:
+      type: string
+      enum: [critical, high, normal]
+    TaskState:
+      type: string
+      enum: [ASSIGNED, IN_PROGRESS, EVIDENCE_SUBMITTED, CHANGES_REQUESTED, VERIFIED, PENDING_VALIDATION, CLOSED]
+    Channel:
+      type: string
+      enum: [inapp, email, sms]
+    FacilityStatus:
+      type: string
+      enum: [active, inactive]
+    CycleStatus:
+      type: string
+      enum: [planned, active, closed]
+    ChecklistStatus:
+      type: string
+      enum: [draft, published, retired]
+    AssessmentStatus:
+      type: string
+      enum: [draft, submitted, completed]
+    ReleaseState:
+      type: string
+      enum: [n/a, held, released]
+    PlanStatus:
+      type: string
+      enum: [draft, active, closed]
+    SupportRequestStatus:
+      type: string
+      enum: [open, requested, accepted, rejected, held, closed]
+    Skill:
+      type: string
+      enum: [hand_hygiene, ppe, waste, cleaning, device_bundles, sterilisation]
+    RuleCode:
+      type: string
+      pattern: '^R[0-9]{1,3}$'
+    DecisionKind:
+      type: string
+      enum: [accept, return, validate, validation_return]
+    DecisionReasonCode:
+      type: string
+      description: Programme reason list (seeded; FR-014).
+      enum: [MEETS_STANDARD, MEETS_STANDARD_WITH_NOTE, EVIDENCE_UNCLEAR, EVIDENCE_INCOMPLETE, WRONG_LOCATION_OR_ITEM, STANDARD_NOT_MET, PATIENT_DATA_VISIBLE, OTHER]
+    LedgerSubjectType:
+      type: string
+      enum: [programme, facility, ward, cycle, scope_assignment, checklist_version, risk_default, escalation_rule, assessment, evidence, plan, task, escalation, support_request, clock, import_job]
+    DataQualityExceptionKind:
+      type: string
+      enum: [PHOTO_NO_GPS, GPS_FAR_FROM_FACILITY, DEVICE_CLOCK_SKEW, LATE_UPLOAD, DUPLICATE_PHOTO_ACROSS_WARDS, NO_BASELINE, STALE_DEVICE_QUEUE]
+    ResourceMeta:
+      type: object
+      required: [id, v, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ObjectId'}
+        v: {type: integer, minimum: 0, description: Version used for If-Match.}
+        createdAt: {$ref: '#/components/schemas/Timestamp'}
+        updatedAt: {$ref: '#/components/schemas/Timestamp'}
+    Page:
+      type: object
+      required: [nextCursor]
+      properties:
+        nextCursor:
+          type: [string, 'null']
+          description: Null on the last page.
+    Actor:
+      type: object
+      required: [userId, role]
+      additionalProperties: false
+      properties:
+        userId: {type: string, maxLength: 64, description: ELEVATE user id or `system`.}
+        role:
+          type: string
+          enum: [STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR, SYSTEM]
+
+    # ---------- errors
+    ProblemCode:
+      type: string
+      enum:
+        - UNAUTHENTICATED
+        - SESSION_EXPIRED
+        - OTP_INVALID
+        - CSRF_INVALID
+        - ROLE_DENIED
+        - SCOPE_DENIED
+        - NOT_OWNER
+        - NOT_FOUND
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_REUSED
+        - IDEMPOTENCY_KEY_IN_PROGRESS
+        - IF_MATCH_REQUIRED
+        - VERSION_CONFLICT
+        - CHECKLIST_PUBLISHED
+        - CHECKLIST_VERSION_RETIRED
+        - INVALID_TRANSITION
+        - DEPENDENCY_OPEN
+        - DECLARATION_REQUIRED
+        - EVIDENCE_RULE_NOT_MET
+        - EVIDENCE_HASH_MISMATCH
+        - RATE_LIMITED
+        - ELEVATE_UNAVAILABLE
+        - STORAGE_UNAVAILABLE
+        - DEMO_MODE_DISABLED
+        - INTERNAL_ERROR
+    Problem:
+      type: object
+      description: RFC 9457 problem details. Extension members are allowed.
+      required: [type, title, status, code, correlationId]
+      properties:
+        type: {type: string, format: uri-reference, example: 'https://ipc.localhost/problems/version-conflict'}
+        title: {type: string, maxLength: 200}
+        status: {type: integer, minimum: 400, maximum: 599}
+        code: {$ref: '#/components/schemas/ProblemCode'}
+        detail: {type: string, maxLength: 1000}
+        instance: {type: string, format: uri-reference}
+        correlationId: {type: string, maxLength: 64}
+        errors:
+          type: array
+          description: Field-level errors for VALIDATION_FAILED.
+          items:
+            type: object
+            required: [path, message]
+            properties:
+              path: {type: string, maxLength: 200}
+              message: {type: string, maxLength: 300}
+        unavailable:
+          type: array
+          description: Functions unavailable for ELEVATE_UNAVAILABLE / STORAGE_UNAVAILABLE.
+          items: {type: string, maxLength: 64}
+    ConflictProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            currentVersion: {type: integer, minimum: 0}
+            current:
+              description: The current resource (for VERSION_CONFLICT) so the client can show differences.
+              anyOf:
+                - $ref: '#/components/schemas/Task'
+                - $ref: '#/components/schemas/PlanDetail'
+                - $ref: '#/components/schemas/AssessmentContext'
+                - $ref: '#/components/schemas/ChecklistVersion'
+                - $ref: '#/components/schemas/SupportRequest'
+                - $ref: '#/components/schemas/EvidenceItem'
+                - type: object
+            blockingTasks:
+              type: array
+              description: For DEPENDENCY_OPEN.
+              items:
+                type: object
+                required: [id, title, state]
+                properties:
+                  id: {$ref: '#/components/schemas/ObjectId'}
+                  title: {$ref: '#/components/schemas/LocalizedText'}
+                  state: {$ref: '#/components/schemas/TaskState'}
+
+    # ---------- auth
+    LoginRequest:
+      type: object
+      required: [identifier, password, client]
+      additionalProperties: false
+      properties:
+        identifier: {type: string, maxLength: 254, description: ELEVATE email or phone.}
+        password: {type: string, maxLength: 256, writeOnly: true}
+        client: {type: string, enum: [web, field]}
+        deviceId: {type: string, format: uuid}
+    OtpRequest:
+      type: object
+      required: [identifier]
+      additionalProperties: false
+      properties:
+        identifier: {type: string, maxLength: 254}
+    OtpVerifyRequest:
+      type: object
+      required: [identifier, otp, client]
+      additionalProperties: false
+      properties:
+        identifier: {type: string, maxLength: 254}
+        otp: {type: string, pattern: '^[0-9]{4,8}$', writeOnly: true}
+        challengeId: {type: string, maxLength: 64}
+        client: {type: string, enum: [web, field]}
+        deviceId: {type: string, format: uuid}
+    OtpChallenge:
+      type: object
+      required: [otpRequired]
+      properties:
+        otpRequired: {type: boolean, const: true}
+        challengeId: {type: string, maxLength: 64}
+        expiresAt: {$ref: '#/components/schemas/Timestamp'}
+    Session:
+      type: object
+      required: [user, csrfToken, expiresAt]
+      properties:
+        user: {$ref: '#/components/schemas/Me'}
+        csrfToken: {type: string, maxLength: 128}
+        expiresAt: {$ref: '#/components/schemas/Timestamp'}
+    Me:
+      type: object
+      required: [userId, name, assignments, activeRole, preferredLanguage, demoMode]
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        name: {type: string, maxLength: 200}
+        activeRole: {$ref: '#/components/schemas/Role'}
+        assignments:
+          type: array
+          items: {$ref: '#/components/schemas/ScopeAssignment'}
+        preferredLanguage: {$ref: '#/components/schemas/Language'}
+        csrfToken: {type: string, maxLength: 128}
+        sessionExpiresAt: {$ref: '#/components/schemas/Timestamp'}
+        smsConsent: {$ref: '#/components/schemas/SmsConsent'}
+        demoMode: {type: boolean}
+        profile: {$ref: '#/components/schemas/Profile'}
+    UserSummary:
+      type: object
+      required: [userId, name, roles, active]
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        name: {type: string, maxLength: 200}
+        roles:
+          type: array
+          items: {$ref: '#/components/schemas/Role'}
+        wardIds:
+          type: array
+          items: {$ref: '#/components/schemas/ObjectId'}
+        active: {type: boolean}
+    SmsConsentRequest:
+      type: object
+      required: [given]
+      additionalProperties: false
+      properties:
+        given: {type: boolean}
+        source: {type: string, enum: [field_app, officer_web], default: officer_web}
+    SmsConsent:
+      type: object
+      required: [given, at, source]
+      properties:
+        given: {type: boolean}
+        at: {$ref: '#/components/schemas/Timestamp'}
+        source: {type: string, maxLength: 32}
+
+    # ---------- home
+    HomeSummary:
+      type: object
+      required: [role, programmeNow, cards]
+      properties:
+        role: {$ref: '#/components/schemas/Role'}
+        programmeNow: {$ref: '#/components/schemas/Timestamp'}
+        cards:
+          type: array
+          items:
+            type: object
+            required: [kind, count]
+            properties:
+              kind:
+                type: string
+                enum: [assessments_due, draft_plans, my_tasks, review_queue, validation_queue, needs_reassignment, overdue_critical, escalations, support_requests, held_results, unread_notifications, stale_devices, data_quality_exceptions, checklist_drafts, import_jobs]
+              count: {type: integer, minimum: 0}
+              href: {type: string, format: uri-reference, description: The list operation that backs the card.}
+              preview:
+                type: array
+                maxItems: 5
+                items:
+                  type: object
+                  required: [id, label]
+                  properties:
+                    id: {type: string, maxLength: 64}
+                    label: {type: string, maxLength: 200}
+                    dueAt: {$ref: '#/components/schemas/Timestamp'}
+                    riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+
+    # ---------- reference
+    Programme:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [code, name, stateEntityId, elevateOrgId, profile, languages]
+          properties:
+            code: {type: string, pattern: '^[A-Z0-9-]{2,32}$'}
+            name: {type: string, maxLength: 200}
+            stateEntityId: {$ref: '#/components/schemas/ElevateRef'}
+            elevateOrgId: {$ref: '#/components/schemas/ElevateRef'}
+            profile: {$ref: '#/components/schemas/Profile'}
+            languages:
+              type: array
+              items: {$ref: '#/components/schemas/Language'}
+            demoMode: {type: boolean}
+    ProgrammeUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, maxLength: 200}
+        languages:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/Language'}
+    GeoPoint:
+      type: object
+      required: [lat, lng]
+      additionalProperties: false
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+    Ward:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [facilityId, wardCode, elevateEntityId, name, wardType, active]
+          properties:
+            facilityId: {$ref: '#/components/schemas/ObjectId'}
+            wardCode: {type: string, maxLength: 32}
+            elevateEntityId: {$ref: '#/components/schemas/ElevateRef'}
+            name: {type: string, maxLength: 200}
+            wardType: {type: string, maxLength: 32, examples: [ICU, general, OT, labour]}
+            active: {type: boolean}
+            serviceAccountUserId: {$ref: '#/components/schemas/UserId'}
+    Facility:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [facilityCode, elevateEntityId, name, districtCode, level, location, status]
+          properties:
+            facilityCode: {type: string, maxLength: 64}
+            elevateEntityId: {$ref: '#/components/schemas/ElevateRef'}
+            name: {type: string, maxLength: 200}
+            districtCode: {type: string, maxLength: 32}
+            level: {type: string, enum: [district, sub-district, community]}
+            location: {$ref: '#/components/schemas/GeoPoint'}
+            status: {$ref: '#/components/schemas/FacilityStatus'}
+            wards:
+              type: array
+              items: {$ref: '#/components/schemas/Ward'}
+    Cycle:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [code, startsAt, endsAt, targetDates, status]
+          properties:
+            code: {type: string, pattern: '^[0-9]{4}-C[0-9]+$'}
+            startsAt: {$ref: '#/components/schemas/Timestamp'}
+            endsAt: {$ref: '#/components/schemas/Timestamp'}
+            targetDates:
+              type: object
+              required: [baselineBy]
+              properties:
+                baselineBy: {$ref: '#/components/schemas/Timestamp'}
+                repeatBy: {$ref: '#/components/schemas/Timestamp'}
+            elevateSolutionIds:
+              type: object
+              properties:
+                plan: {$ref: '#/components/schemas/ElevateRef'}
+                observation: {$ref: '#/components/schemas/ElevateRef'}
+            status: {$ref: '#/components/schemas/CycleStatus'}
+    CycleCreate:
+      type: object
+      required: [code, startsAt, endsAt, targetDates]
+      additionalProperties: false
+      properties:
+        code: {type: string, pattern: '^[0-9]{4}-C[0-9]+$'}
+        startsAt: {$ref: '#/components/schemas/Timestamp'}
+        endsAt: {$ref: '#/components/schemas/Timestamp'}
+        targetDates:
+          type: object
+          required: [baselineBy]
+          additionalProperties: false
+          properties:
+            baselineBy: {$ref: '#/components/schemas/Timestamp'}
+            repeatBy: {$ref: '#/components/schemas/Timestamp'}
+    CycleUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        startsAt: {$ref: '#/components/schemas/Timestamp'}
+        endsAt: {$ref: '#/components/schemas/Timestamp'}
+        targetDates:
+          type: object
+          additionalProperties: false
+          properties:
+            baselineBy: {$ref: '#/components/schemas/Timestamp'}
+            repeatBy: {$ref: '#/components/schemas/Timestamp'}
+        status: {$ref: '#/components/schemas/CycleStatus'}
+    ImportUpload:
+      type: object
+      required: [kind, file]
+      properties:
+        kind: {type: string, enum: [facility, hr]}
+        file:
+          type: string
+          contentMediaType: text/csv
+          description: CSV, at most 5 MB. Facility rows carry facility code, district, level, location and wards; HR rows carry staff id, name, contact, role, facility/ward codes, status (active or left). No patient data.
+        dryRun: {type: boolean, default: false}
+    ImportJob:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [kind, status, fileSha256, counts]
+          properties:
+            kind: {type: string, enum: [facility, hr]}
+            status: {type: string, enum: [queued, running, succeeded, partially_succeeded, failed]}
+            dryRun: {type: boolean}
+            fileSha256: {$ref: '#/components/schemas/Sha256'}
+            counts:
+              type: object
+              required: [rows, created, updated, deactivated, failed]
+              properties:
+                rows: {type: integer, minimum: 0}
+                created: {type: integer, minimum: 0}
+                updated: {type: integer, minimum: 0}
+                deactivated: {type: integer, minimum: 0}
+                failed: {type: integer, minimum: 0}
+                tasksNeedingReassignment: {type: integer, minimum: 0}
+            rowErrors:
+              type: array
+              maxItems: 1000
+              items:
+                type: object
+                required: [row, code, message]
+                properties:
+                  row: {type: integer, minimum: 1}
+                  code: {type: string, maxLength: 64}
+                  message: {type: string, maxLength: 300}
+            substitutions:
+              type: array
+              description: ELEVATE capability substitutions used (e.g. per-record API instead of bulk upload).
+              items: {type: string, maxLength: 300}
+            startedAt: {$ref: '#/components/schemas/Timestamp'}
+            finishedAt: {$ref: '#/components/schemas/Timestamp'}
+    Scope:
+      type: object
+      required: [level]
+      additionalProperties: false
+      properties:
+        level: {$ref: '#/components/schemas/ScopeLevel'}
+        districtCode: {type: string, maxLength: 32}
+        facilityId: {$ref: '#/components/schemas/ObjectId'}
+        facilityIds:
+          type: array
+          description: EXTERNAL_AUDITOR facility list.
+          items: {$ref: '#/components/schemas/ObjectId'}
+        wardIds:
+          type: array
+          items: {$ref: '#/components/schemas/ObjectId'}
+    ScopeAssignment:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [userId, role, scope, validFrom, source]
+          properties:
+            userId: {$ref: '#/components/schemas/UserId'}
+            role: {$ref: '#/components/schemas/Role'}
+            scope: {$ref: '#/components/schemas/Scope'}
+            validFrom: {$ref: '#/components/schemas/Timestamp'}
+            validTo: {$ref: '#/components/schemas/Timestamp'}
+            source: {type: string, enum: [hr_import, admin]}
+    ScopeAssignmentCreate:
+      type: object
+      required: [userId, role, scope, validFrom]
+      additionalProperties: false
+      description: Scope level must fit the role (data-model §1); otherwise 422 VALIDATION_FAILED.
+      properties:
+        userId: {$ref: '#/components/schemas/UserId'}
+        role: {$ref: '#/components/schemas/Role'}
+        scope: {$ref: '#/components/schemas/Scope'}
+        validFrom: {$ref: '#/components/schemas/Timestamp'}
+        validTo: {$ref: '#/components/schemas/Timestamp'}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    ScopeAssignmentUpdate:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        scope: {$ref: '#/components/schemas/Scope'}
+        validTo: {$ref: '#/components/schemas/Timestamp'}
+        reason: {$ref: '#/components/schemas/FreeText'}
+
+    # ---------- catalogue & rules
+    EvidenceRule:
+      type: object
+      required: [photoRequired, minPhotos]
+      additionalProperties: false
+      properties:
+        photoRequired: {type: boolean}
+        minPhotos: {type: integer, minimum: 0, maximum: 10}
+    ChecklistSection:
+      type: object
+      required: [sectionKey, title, wardTypes]
+      additionalProperties: false
+      properties:
+        sectionKey: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
+        title: {$ref: '#/components/schemas/LocalizedText'}
+        wardTypes:
+          type: array
+          description: Ward types the section applies to (empty = all).
+          items: {type: string, maxLength: 32}
+    ChecklistQuestion:
+      type: object
+      required: [questionKey, sectionKey, text, riskLevel, passMark, maxScore]
+      additionalProperties: false
+      properties:
+        questionKey: {type: string, pattern: '^[A-Z0-9_.-]{1,40}$', description: Stable programme key across versions.}
+        elevateQuestionExternalId: {type: string, maxLength: 64}
+        sectionKey: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
+        text: {$ref: '#/components/schemas/LocalizedText'}
+        textHash: {$ref: '#/components/schemas/Sha256'}
+        answerType: {type: string, enum: [score, yes_no, single_choice], default: score}
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label, score]
+            properties:
+              value: {type: string, maxLength: 32}
+              label: {$ref: '#/components/schemas/LocalizedText'}
+              score: {type: number}
+        riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+        passMark: {type: number, minimum: 0}
+        maxScore: {type: number, minimum: 0}
+        templateTaskKey: {type: string, maxLength: 40}
+    PlanTemplateTask:
+      type: object
+      required: [templateTaskKey, title]
+      additionalProperties: false
+      properties:
+        templateTaskKey: {type: string, maxLength: 40}
+        title: {$ref: '#/components/schemas/LocalizedText'}
+        description: {$ref: '#/components/schemas/LocalizedText'}
+    ChecklistVersion:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [checklistCode, version, status, sections, questions]
+          properties:
+            checklistCode: {type: string, maxLength: 32}
+            version: {type: integer, minimum: 1}
+            status: {$ref: '#/components/schemas/ChecklistStatus'}
+            elevateSolutionId: {$ref: '#/components/schemas/ElevateRef'}
+            elevateObservationTemplateId: {$ref: '#/components/schemas/ElevateRef'}
+            publishedAt: {$ref: '#/components/schemas/Timestamp'}
+            graceUntil: {$ref: '#/components/schemas/Timestamp'}
+            contentHash: {$ref: '#/components/schemas/Sha256'}
+            planTemplate:
+              type: object
+              required: [version]
+              properties:
+                elevateTemplateId: {$ref: '#/components/schemas/ElevateRef'}
+                version: {type: integer, minimum: 1}
+                tasks:
+                  type: array
+                  items: {$ref: '#/components/schemas/PlanTemplateTask'}
+            sections:
+              type: array
+              items: {$ref: '#/components/schemas/ChecklistSection'}
+            questions:
+              type: array
+              items: {$ref: '#/components/schemas/ChecklistQuestion'}
+    ChecklistDraftCreate:
+      type: object
+      required: [checklistCode]
+      additionalProperties: false
+      properties:
+        checklistCode: {type: string, maxLength: 32}
+        basedOnVersionId: {$ref: '#/components/schemas/ObjectId'}
+        sections:
+          type: array
+          items: {$ref: '#/components/schemas/ChecklistSection'}
+        questions:
+          type: array
+          items: {$ref: '#/components/schemas/ChecklistQuestion'}
+        planTemplateTasks:
+          type: array
+          items: {$ref: '#/components/schemas/PlanTemplateTask'}
+    ChecklistDraftUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        sections:
+          type: array
+          items: {$ref: '#/components/schemas/ChecklistSection'}
+        questions:
+          type: array
+          items: {$ref: '#/components/schemas/ChecklistQuestion'}
+        planTemplateTasks:
+          type: array
+          items: {$ref: '#/components/schemas/PlanTemplateTask'}
+    RiskDefault:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [riskLevel, dueDays, evidenceRule, secondValidation]
+          properties:
+            riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+            dueDays: {type: integer, minimum: 1, maximum: 365}
+            evidenceRule: {$ref: '#/components/schemas/EvidenceRule'}
+            secondValidation: {type: boolean}
+    RiskDefaultUpdate:
+      type: object
+      required: [dueDays, evidenceRule, secondValidation]
+      additionalProperties: false
+      properties:
+        dueDays: {type: integer, minimum: 1, maximum: 365}
+        evidenceRule: {$ref: '#/components/schemas/EvidenceRule'}
+        secondValidation: {type: boolean}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    EscalationCondition:
+      type: object
+      required: [type, riskLevels]
+      additionalProperties: false
+      properties:
+        type: {type: string, enum: [overdue, rejections]}
+        riskLevels:
+          type: array
+          items: {$ref: '#/components/schemas/RiskLevel'}
+        thresholdHours: {type: integer, minimum: 1}
+        thresholdCount: {type: integer, minimum: 1}
+    EscalationTarget:
+      type: object
+      required: [mode]
+      additionalProperties: false
+      properties:
+        mode: {type: string, enum: [role, level_above_decider]}
+        role: {$ref: '#/components/schemas/Role'}
+    EscalationRule:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [code, condition, target, channels, active]
+          properties:
+            code: {$ref: '#/components/schemas/RuleCode'}
+            condition: {$ref: '#/components/schemas/EscalationCondition'}
+            target: {$ref: '#/components/schemas/EscalationTarget'}
+            channels:
+              type: array
+              items: {$ref: '#/components/schemas/Channel'}
+            active: {type: boolean}
+    EscalationRuleInput:
+      type: object
+      required: [code, condition, target, channels]
+      additionalProperties: false
+      properties:
+        code: {$ref: '#/components/schemas/RuleCode'}
+        condition: {$ref: '#/components/schemas/EscalationCondition'}
+        target: {$ref: '#/components/schemas/EscalationTarget'}
+        channels:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/Channel'}
+        active: {type: boolean, default: true}
+    EscalationRuleUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        condition: {$ref: '#/components/schemas/EscalationCondition'}
+        target: {$ref: '#/components/schemas/EscalationTarget'}
+        channels:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/Channel'}
+        active: {type: boolean}
+        reason: {$ref: '#/components/schemas/FreeText'}
+
+    # ---------- demo
+    DemoClock:
+      type: object
+      required: [v, realNow, programmeNow, offsetMs, isRealTime, demoMode]
+      properties:
+        v: {type: integer, minimum: 0}
+        realNow: {$ref: '#/components/schemas/Timestamp'}
+        programmeNow: {$ref: '#/components/schemas/Timestamp'}
+        offsetMs: {type: integer, minimum: 0}
+        isRealTime: {type: boolean}
+        demoMode: {type: boolean}
+        setBy: {$ref: '#/components/schemas/UserId'}
+        setAt: {$ref: '#/components/schemas/Timestamp'}
+    DemoClockSet:
+      type: object
+      additionalProperties: false
+      description: Exactly one of `programmeNow` or `advanceBy`. Time only moves forward.
+      oneOf:
+        - required: [programmeNow]
+        - required: [advanceBy]
+      properties:
+        programmeNow: {$ref: '#/components/schemas/Timestamp'}
+        advanceBy: {type: string, format: duration, examples: [P7D, PT48H, P30D]}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    SweepResult:
+      type: object
+      required: [runAt, programmeAt, trigger, evaluatedTasks, created, skippedDuplicates, vacantTargets]
+      properties:
+        runAt: {$ref: '#/components/schemas/Timestamp'}
+        programmeAt: {$ref: '#/components/schemas/Timestamp'}
+        trigger: {type: string, enum: [schedule, on_return, demo_run_now]}
+        evaluatedTasks: {type: integer, minimum: 0}
+        created:
+          type: array
+          items: {$ref: '#/components/schemas/Escalation'}
+        skippedDuplicates: {type: integer, minimum: 0}
+        vacantTargets: {type: integer, minimum: 0}
+
+    # ---------- assessment
+    Scores:
+      type: object
+      required: [total]
+      properties:
+        total: {type: number}
+        max: {type: number}
+        bySection:
+          type: object
+          additionalProperties: {type: number}
+    AssessmentContext:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [elevateObservationId, wardId, facilityId, cycleId, checklistVersionId, assessorUserId, assessorType, isBaselineForCycle, status, releaseState]
+          properties:
+            elevateObservationId: {$ref: '#/components/schemas/ElevateRef'}
+            elevateSubmissionId: {$ref: '#/components/schemas/ElevateRef'}
+            submissionNumber: {type: integer, minimum: 1}
+            wardId: {$ref: '#/components/schemas/ObjectId'}
+            facilityId: {$ref: '#/components/schemas/ObjectId'}
+            cycleId: {$ref: '#/components/schemas/ObjectId'}
+            checklistVersionId: {$ref: '#/components/schemas/ObjectId'}
+            checklistVersion: {type: integer, minimum: 1}
+            assessorUserId: {$ref: '#/components/schemas/UserId'}
+            assessorType: {type: string, enum: [internal, external]}
+            isBaselineForCycle: {type: boolean}
+            baselineOfId: {$ref: '#/components/schemas/ObjectId'}
+            declaration:
+              type: object
+              required: [accepted, at]
+              properties:
+                accepted: {type: boolean, const: true}
+                at: {$ref: '#/components/schemas/Timestamp'}
+            status: {$ref: '#/components/schemas/AssessmentStatus'}
+            completedAt: {$ref: '#/components/schemas/Timestamp'}
+            scores: {$ref: '#/components/schemas/Scores'}
+            failedQuestionKeys:
+              type: array
+              items: {type: string, maxLength: 40}
+            releaseState: {$ref: '#/components/schemas/ReleaseState'}
+            releasedBy: {$ref: '#/components/schemas/UserId'}
+            releasedAt: {$ref: '#/components/schemas/Timestamp'}
+            evidenceIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            planOutcome:
+              type: string
+              description: What completion produced (US3 AS4/AS5/AS7).
+              enum: [pending, draft_plan_created, no_actions_needed, same_cycle_no_plan]
+            planId: {$ref: '#/components/schemas/ObjectId'}
+    FormBundle:
+      type: object
+      required: [assessmentId, wardId, wardType, cycleId, checklistVersionId, checklistCode, version, contentHash, bundleHash, issuedAt, sections, questions]
+      properties:
+        assessmentId: {$ref: '#/components/schemas/ObjectId'}
+        assessmentV: {type: integer, minimum: 0}
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        wardType: {type: string, maxLength: 32}
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+        checklistVersionId: {$ref: '#/components/schemas/ObjectId'}
+        checklistCode: {type: string, maxLength: 32}
+        version: {type: integer, minimum: 1}
+        contentHash: {$ref: '#/components/schemas/Sha256'}
+        bundleHash: {$ref: '#/components/schemas/Sha256'}
+        graceUntil: {$ref: '#/components/schemas/Timestamp'}
+        issuedAt: {$ref: '#/components/schemas/Timestamp'}
+        sections:
+          type: array
+          description: Only sections that apply to the ward type.
+          items: {$ref: '#/components/schemas/ChecklistSection'}
+        questions:
+          type: array
+          items: {$ref: '#/components/schemas/ChecklistQuestion'}
+    Answer:
+      type: object
+      required: [questionKey, value]
+      additionalProperties: false
+      properties:
+        questionKey: {type: string, maxLength: 40}
+        value:
+          type: [number, string, boolean]
+        observation: {$ref: '#/components/schemas/FreeText'}
+        evidenceIds:
+          type: array
+          maxItems: 10
+          items: {$ref: '#/components/schemas/ObjectId'}
+    AssessmentSubmission:
+      type: object
+      required: [checklistVersionId, bundleHash, declaration, answers, deviceSubmittedAt]
+      additionalProperties: false
+      properties:
+        checklistVersionId: {$ref: '#/components/schemas/ObjectId'}
+        bundleHash: {$ref: '#/components/schemas/Sha256'}
+        declaration:
+          type: object
+          required: [accepted, at]
+          additionalProperties: false
+          properties:
+            accepted: {type: boolean, description: Must be true; false or missing → 422 DECLARATION_REQUIRED.}
+            at: {$ref: '#/components/schemas/Timestamp'}
+        answers:
+          type: array
+          minItems: 1
+          maxItems: 300
+          items: {$ref: '#/components/schemas/Answer'}
+        notes: {$ref: '#/components/schemas/FreeText'}
+        deviceId: {type: string, format: uuid}
+        deviceSubmittedAt: {$ref: '#/components/schemas/Timestamp'}
+    BaselineChange:
+      type: object
+      required: [baselineOfId, reason]
+      additionalProperties: false
+      properties:
+        baselineOfId: {$ref: '#/components/schemas/ObjectId'}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    Comparison:
+      type: object
+      required: [assessmentId, baselineAssessmentId, wardId, facilityId, current, baseline, sections, notComparable]
+      properties:
+        assessmentId: {$ref: '#/components/schemas/ObjectId'}
+        baselineAssessmentId: {type: ['string', 'null'], pattern: '^[a-f0-9]{24}$', description: Null when no baseline exists.}
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        facilityId: {$ref: '#/components/schemas/ObjectId'}
+        current:
+          $ref: '#/components/schemas/ComparisonSide'
+        baseline:
+          $ref: '#/components/schemas/ComparisonSide'
+        totalChange: {type: number}
+        sections:
+          type: array
+          items:
+            type: object
+            required: [sectionKey, current, baseline, change, comparedQuestions]
+            properties:
+              sectionKey: {type: string, maxLength: 40}
+              title: {$ref: '#/components/schemas/LocalizedText'}
+              current: {type: number}
+              baseline: {type: number}
+              change: {type: number}
+              comparedQuestions: {type: integer, minimum: 0}
+        notComparable:
+          type: array
+          description: Questions listed under "Not comparable (version change)".
+          items:
+            type: object
+            required: [questionKey, reason]
+            properties:
+              questionKey: {type: string, maxLength: 40}
+              reason: {type: string, enum: [missing_in_baseline, missing_in_current, text_changed]}
+    ComparisonSide:
+      type: object
+      required: [cycleId, checklistVersionId, checklistVersion, assessorType, total]
+      properties:
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+        checklistVersionId: {$ref: '#/components/schemas/ObjectId'}
+        checklistVersion: {type: integer, minimum: 1}
+        assessorType: {type: string, enum: [internal, external]}
+        completedAt: {$ref: '#/components/schemas/Timestamp'}
+        total: {type: number}
+    Trend:
+      type: object
+      required: [wardId, points]
+      properties:
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        points:
+          type: array
+          items:
+            type: object
+            required: [cycleId, cycleCode, assessmentId, checklistVersion, total]
+            properties:
+              cycleId: {$ref: '#/components/schemas/ObjectId'}
+              cycleCode: {type: string, maxLength: 16}
+              assessmentId: {$ref: '#/components/schemas/ObjectId'}
+              checklistVersion: {type: integer, minimum: 1}
+              assessorType: {type: string, enum: [internal, external]}
+              total: {type: number}
+              bySection:
+                type: object
+                additionalProperties: {type: number}
+
+    # ---------- evidence
+    Gps:
+      type: object
+      required: [lat, lng, accuracyM]
+      additionalProperties: false
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+        accuracyM: {type: number, minimum: 0}
+    EvidenceMime:
+      type: string
+      enum: [image/jpeg, image/png, application/pdf]
+    EvidenceLink:
+      type: object
+      required: [type, id]
+      additionalProperties: false
+      properties:
+        type: {type: string, enum: [task, question]}
+        id: {type: string, maxLength: 64, description: "Task id, or `<assessmentId>:<questionKey>`."}
+    EvidenceItem:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [sha256, sizeBytes, mime, capturedAt, gps, gpsUnavailable, uploadedBy, facilityId, wardId, link, state]
+          properties:
+            sha256: {$ref: '#/components/schemas/Sha256'}
+            sizeBytes: {type: integer, minimum: 1, maximum: 10485760}
+            mime: {$ref: '#/components/schemas/EvidenceMime'}
+            capturedAt: {$ref: '#/components/schemas/Timestamp'}
+            receivedAt: {$ref: '#/components/schemas/Timestamp'}
+            clockSkewSec: {type: integer}
+            gps:
+              oneOf:
+                - $ref: '#/components/schemas/Gps'
+                - type: 'null'
+            gpsUnavailable: {type: boolean}
+            uploadedBy: {$ref: '#/components/schemas/UserId'}
+            facilityId: {$ref: '#/components/schemas/ObjectId'}
+            wardId: {$ref: '#/components/schemas/ObjectId'}
+            link: {$ref: '#/components/schemas/EvidenceLink'}
+            state: {type: string, enum: [intent, uploaded, confirmed, rejected, deleted_patient_data]}
+            deletedAt: {$ref: '#/components/schemas/Timestamp'}
+            deletedBy: {$ref: '#/components/schemas/UserId'}
+    EvidenceIntentRequest:
+      type: object
+      required: [sha256, sizeBytes, mime, capturedAt, gps, gpsUnavailable, wardId, link, deviceId]
+      additionalProperties: false
+      properties:
+        sha256: {$ref: '#/components/schemas/Sha256'}
+        sizeBytes: {type: integer, minimum: 1, maximum: 10485760}
+        mime: {$ref: '#/components/schemas/EvidenceMime'}
+        capturedAt: {$ref: '#/components/schemas/Timestamp'}
+        gps:
+          oneOf:
+            - $ref: '#/components/schemas/Gps'
+            - type: 'null'
+        gpsUnavailable: {type: boolean}
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        link: {$ref: '#/components/schemas/EvidenceLink'}
+        deviceId: {type: string, format: uuid}
+    SignedUrl:
+      type: object
+      required: [url, method, expiresAt]
+      properties:
+        url: {type: string, format: uri}
+        method: {type: string, enum: [GET, PUT]}
+        headers:
+          type: object
+          description: Headers the client must send with the PUT (e.g. Content-Type, x-amz-checksum-sha256).
+          additionalProperties: {type: string}
+        expiresAt: {$ref: '#/components/schemas/Timestamp'}
+        ttlSec: {type: integer, minimum: 1, maximum: 300}
+    EvidenceIntentResponse:
+      type: object
+      required: [evidence, upload]
+      properties:
+        evidence: {$ref: '#/components/schemas/EvidenceItem'}
+        upload: {$ref: '#/components/schemas/SignedUrl'}
+        alreadyUploaded: {type: boolean, description: True when an item with this sha256 and link already exists.}
+    PatientDataDeletion:
+      type: object
+      required: [reasonCode]
+      additionalProperties: false
+      properties:
+        reasonCode: {type: string, const: PATIENT_DATA_VISIBLE}
+        reasonText: {$ref: '#/components/schemas/FreeText'}
+
+    # ---------- plans & tasks
+    Goal:
+      type: object
+      required: [key, text]
+      additionalProperties: false
+      properties:
+        key: {type: string, maxLength: 40}
+        text: {$ref: '#/components/schemas/FreeText'}
+    Milestone:
+      type: object
+      required: [key, text, dueAt]
+      additionalProperties: false
+      properties:
+        key: {type: string, maxLength: 40}
+        text: {$ref: '#/components/schemas/FreeText'}
+        dueAt: {$ref: '#/components/schemas/Timestamp'}
+    Plan:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [wardId, facilityId, cycleId, sourceAssessmentId, status, planTemplateVersion, revision]
+          properties:
+            wardId: {$ref: '#/components/schemas/ObjectId'}
+            facilityId: {$ref: '#/components/schemas/ObjectId'}
+            cycleId: {$ref: '#/components/schemas/ObjectId'}
+            sourceAssessmentId: {$ref: '#/components/schemas/ObjectId'}
+            status: {$ref: '#/components/schemas/PlanStatus'}
+            elevateProjectId: {$ref: '#/components/schemas/ElevateRef'}
+            planTemplateVersion: {type: integer, minimum: 1}
+            revision: {type: integer, minimum: 0}
+            goals:
+              type: array
+              items: {$ref: '#/components/schemas/Goal'}
+            milestones:
+              type: array
+              items: {$ref: '#/components/schemas/Milestone'}
+            carriedOverTaskIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            approvedBy: {$ref: '#/components/schemas/UserId'}
+            approvedAt: {$ref: '#/components/schemas/Timestamp'}
+            draftCreatedAt: {$ref: '#/components/schemas/Timestamp'}
+            taskCounts:
+              type: object
+              additionalProperties: {type: integer, minimum: 0}
+    DraftTask:
+      type: object
+      required: [taskKey, title, riskLevel, dueAt, evidenceRule, secondValidation, included]
+      properties:
+        taskKey: {type: string, maxLength: 40}
+        title: {$ref: '#/components/schemas/LocalizedText'}
+        sourceQuestionKey: {type: string, maxLength: 40}
+        riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+        ownerUserId: {$ref: '#/components/schemas/UserId'}
+        dueAt: {$ref: '#/components/schemas/Timestamp'}
+        dependsOnTaskKeys:
+          type: array
+          items: {type: string, maxLength: 40}
+        evidenceRule: {$ref: '#/components/schemas/EvidenceRule'}
+        secondValidation: {type: boolean}
+        included: {type: boolean}
+    PlanDetail:
+      allOf:
+        - $ref: '#/components/schemas/Plan'
+        - type: object
+          properties:
+            draftTasks:
+              type: array
+              description: Present while status is draft.
+              items: {$ref: '#/components/schemas/DraftTask'}
+            tasks:
+              type: array
+              description: Present once active (includes carried-over tasks by link).
+              items: {$ref: '#/components/schemas/Task'}
+            unplannedFindings:
+              type: array
+              description: Failed questions from later same-cycle assessments the officer may add by revision (US3 AS7).
+              items:
+                type: object
+                required: [assessmentId, questionKey, riskLevel]
+                properties:
+                  assessmentId: {$ref: '#/components/schemas/ObjectId'}
+                  questionKey: {type: string, maxLength: 40}
+                  riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+    DraftPlanUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        goals:
+          type: array
+          items: {$ref: '#/components/schemas/Goal'}
+        milestones:
+          type: array
+          items: {$ref: '#/components/schemas/Milestone'}
+        tasks:
+          type: array
+          items:
+            type: object
+            required: [taskKey]
+            additionalProperties: false
+            properties:
+              taskKey: {type: string, maxLength: 40}
+              ownerUserId: {$ref: '#/components/schemas/UserId'}
+              dueAt: {$ref: '#/components/schemas/Timestamp'}
+              dependsOnTaskKeys:
+                type: array
+                items: {type: string, maxLength: 40}
+              included: {type: boolean}
+    NewTaskInput:
+      type: object
+      required: [title, riskLevel, ownerUserId]
+      additionalProperties: false
+      properties:
+        title: {$ref: '#/components/schemas/LocalizedText'}
+        sourceQuestionKey: {type: string, maxLength: 40}
+        riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+        ownerUserId: {$ref: '#/components/schemas/UserId'}
+        dueAt: {$ref: '#/components/schemas/Timestamp'}
+        dependsOnTaskIds:
+          type: array
+          items: {$ref: '#/components/schemas/ObjectId'}
+    PlanChange:
+      type: object
+      required: [op]
+      additionalProperties: false
+      properties:
+        op: {type: string, enum: [add, remove, update]}
+        taskId: {$ref: '#/components/schemas/ObjectId'}
+        task: {$ref: '#/components/schemas/NewTaskInput'}
+        set:
+          type: object
+          additionalProperties: false
+          properties:
+            title: {$ref: '#/components/schemas/LocalizedText'}
+            dueAt: {$ref: '#/components/schemas/Timestamp'}
+            dependsOnTaskIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+      description: add needs `task`; remove needs `taskId`; update needs `taskId` and `set`.
+    PlanRevisionRequest:
+      type: object
+      required: [reason, changes]
+      additionalProperties: false
+      properties:
+        reason: {$ref: '#/components/schemas/FreeText'}
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/PlanChange'}
+    PlanRevision:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [planId, revision, actorUserId, role, reason, changes, source]
+          properties:
+            planId: {$ref: '#/components/schemas/ObjectId'}
+            revision: {type: integer, minimum: 1}
+            actorUserId: {$ref: '#/components/schemas/UserId'}
+            role: {$ref: '#/components/schemas/Role'}
+            reason: {$ref: '#/components/schemas/FreeText'}
+            source: {type: string, enum: [officer, mentor_outcome, carry_over]}
+            supportRequestId: {$ref: '#/components/schemas/ObjectId'}
+            changes:
+              type: array
+              items:
+                type: object
+                required: [op, taskId]
+                properties:
+                  op: {type: string, enum: [add, remove, update]}
+                  taskId: {$ref: '#/components/schemas/ObjectId'}
+                  before: {type: object}
+                  after: {type: object}
+    BlockedFlag:
+      type: object
+      required: [reason, by, at]
+      properties:
+        reason: {$ref: '#/components/schemas/FreeText'}
+        by: {$ref: '#/components/schemas/UserId'}
+        at: {$ref: '#/components/schemas/Timestamp'}
+    Task:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [planId, wardId, taskKey, title, riskLevel, ownerUserId, dueAt, dependsOnTaskIds, evidenceRule, secondValidation, state, rejectionCount, syncState]
+          properties:
+            planId: {$ref: '#/components/schemas/ObjectId'}
+            wardId: {$ref: '#/components/schemas/ObjectId'}
+            taskKey: {type: string, maxLength: 40}
+            title: {$ref: '#/components/schemas/LocalizedText'}
+            sourceQuestionKey: {type: string, maxLength: 40}
+            riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+            ownerUserId: {$ref: '#/components/schemas/UserId'}
+            dueAt: {$ref: '#/components/schemas/Timestamp'}
+            overdue: {type: boolean, description: Computed against programme time.}
+            dependsOnTaskIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            evidenceRule: {$ref: '#/components/schemas/EvidenceRule'}
+            secondValidation: {type: boolean}
+            state: {$ref: '#/components/schemas/TaskState'}
+            rejectionCount: {type: integer, minimum: 0}
+            blocked:
+              oneOf:
+                - $ref: '#/components/schemas/BlockedFlag'
+                - type: 'null'
+            lastReturnReason:
+              type: object
+              properties:
+                reasonCode: {$ref: '#/components/schemas/DecisionReasonCode'}
+                reasonText: {$ref: '#/components/schemas/FreeText'}
+            supportRequestId: {$ref: '#/components/schemas/ObjectId'}
+            carriedOverFromTaskId: {$ref: '#/components/schemas/ObjectId'}
+            reopenedFromTaskId: {$ref: '#/components/schemas/ObjectId'}
+            elevateTaskId: {$ref: '#/components/schemas/ElevateRef'}
+            currentEvidenceIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            syncState: {type: string, enum: [in_sync, pending, diverged]}
+            needsReassignment: {type: boolean, description: Owner left or lost scope.}
+    EvidenceSubmission:
+      type: object
+      required: [evidenceIds]
+      additionalProperties: false
+      properties:
+        evidenceIds:
+          type: array
+          minItems: 0
+          maxItems: 10
+          items: {$ref: '#/components/schemas/ObjectId'}
+        note: {$ref: '#/components/schemas/FreeText'}
+    AcceptDecisionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reasonCode: {$ref: '#/components/schemas/DecisionReasonCode'}
+        reasonText: {$ref: '#/components/schemas/FreeText'}
+    ReasonedDecisionRequest:
+      type: object
+      required: [reasonCode]
+      additionalProperties: false
+      properties:
+        reasonCode: {$ref: '#/components/schemas/DecisionReasonCode'}
+        reasonText: {$ref: '#/components/schemas/FreeText'}
+    ReassignRequest:
+      type: object
+      required: [newOwnerUserId, reason]
+      additionalProperties: false
+      properties:
+        newOwnerUserId: {$ref: '#/components/schemas/UserId'}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    BlockedFlagRequest:
+      type: object
+      required: [blocked]
+      additionalProperties: false
+      properties:
+        blocked: {type: boolean}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    ReopenRequest:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: {$ref: '#/components/schemas/FreeText'}
+        ownerUserId: {$ref: '#/components/schemas/UserId'}
+        dueAt: {$ref: '#/components/schemas/Timestamp'}
+    Decision:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [taskId, kind, actorUserId, role, evidenceIds, evidenceHashes, at]
+          properties:
+            taskId: {$ref: '#/components/schemas/ObjectId'}
+            kind: {$ref: '#/components/schemas/DecisionKind'}
+            actorUserId: {$ref: '#/components/schemas/UserId'}
+            role: {$ref: '#/components/schemas/Role'}
+            reasonCode: {$ref: '#/components/schemas/DecisionReasonCode'}
+            reasonText: {$ref: '#/components/schemas/FreeText'}
+            evidenceIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            evidenceHashes:
+              type: array
+              items: {$ref: '#/components/schemas/Sha256'}
+            at: {$ref: '#/components/schemas/Timestamp'}
+    TaskHistoryEntry:
+      type: object
+      required: [at, programmeAt, actor, action, ledgerSeq]
+      properties:
+        at: {$ref: '#/components/schemas/Timestamp'}
+        programmeAt: {$ref: '#/components/schemas/Timestamp'}
+        actor: {$ref: '#/components/schemas/Actor'}
+        action: {type: string, maxLength: 64, examples: [task.started, task.returned, task.validated, task.reassigned, task.escalated]}
+        fromState: {$ref: '#/components/schemas/TaskState'}
+        toState: {$ref: '#/components/schemas/TaskState'}
+        reasonCode: {$ref: '#/components/schemas/DecisionReasonCode'}
+        reason: {$ref: '#/components/schemas/FreeText'}
+        evidenceHashes:
+          type: array
+          items: {$ref: '#/components/schemas/Sha256'}
+        previousOwnerUserId: {$ref: '#/components/schemas/UserId'}
+        newOwnerUserId: {$ref: '#/components/schemas/UserId'}
+        escalationId: {$ref: '#/components/schemas/ObjectId'}
+        ledgerSeq: {type: integer, minimum: 1}
+        ledgerHash: {$ref: '#/components/schemas/Sha256'}
+    TaskHistory:
+      type: object
+      required: [task, entries, decisions, escalations]
+      properties:
+        task: {$ref: '#/components/schemas/Task'}
+        entries:
+          type: array
+          items: {$ref: '#/components/schemas/TaskHistoryEntry'}
+        decisions:
+          type: array
+          items: {$ref: '#/components/schemas/Decision'}
+        escalations:
+          type: array
+          items: {$ref: '#/components/schemas/Escalation'}
+
+    # ---------- escalation & notification
+    Escalation:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [taskId, ruleCode, level, targetRole, targetUserIds, raisedAt, raisedBy, vacantTargetFlag]
+          properties:
+            taskId: {$ref: '#/components/schemas/ObjectId'}
+            ruleCode:
+              type: string
+              pattern: '^(R[0-9]{1,3}|manual)$'
+            level: {type: integer, minimum: 1, maximum: 3}
+            targetRole: {$ref: '#/components/schemas/Role'}
+            targetUserIds:
+              type: array
+              items: {$ref: '#/components/schemas/UserId'}
+            raisedAt: {$ref: '#/components/schemas/Timestamp'}
+            programmeAt: {$ref: '#/components/schemas/Timestamp'}
+            raisedBy: {type: string, maxLength: 64, description: '`system` or a user id.'}
+            reason: {$ref: '#/components/schemas/FreeText'}
+            notificationIds:
+              type: array
+              items: {$ref: '#/components/schemas/ObjectId'}
+            vacantTargetFlag: {type: boolean}
+    ManualEscalationRequest:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: {$ref: '#/components/schemas/FreeText'}
+    Notification:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [userId, channel, templateCode, params, status]
+          properties:
+            userId: {$ref: '#/components/schemas/UserId'}
+            channel: {$ref: '#/components/schemas/Channel'}
+            templateCode: {type: string, maxLength: 64}
+            params:
+              type: object
+              description: Template parameters (ids, titles, dates). Never patient data.
+              additionalProperties:
+                type: [string, number, boolean]
+            consent:
+              $ref: '#/components/schemas/SmsConsent'
+            sentAt: {$ref: '#/components/schemas/Timestamp'}
+            status: {type: string, enum: [queued, sent, delivered, failed, read]}
+            providerMessageId: {type: string, maxLength: 128}
+            readAt: {$ref: '#/components/schemas/Timestamp'}
+            subject:
+              type: object
+              properties:
+                type: {$ref: '#/components/schemas/LedgerSubjectType'}
+                id: {type: string, maxLength: 64}
+
+    # ---------- support
+    ShortlistEntry:
+      type: object
+      required: [mentorId, rank, skillMatch, languageMatch, available]
+      properties:
+        mentorId: {$ref: '#/components/schemas/ElevateRef'}
+        name: {type: string, maxLength: 200}
+        rank: {type: integer, minimum: 1}
+        skillMatch: {type: boolean}
+        languageMatch: {type: boolean}
+        available: {type: boolean, description: At least one open slot in the next 14 days of programme time.}
+        nextOpenSlotAt: {$ref: '#/components/schemas/Timestamp'}
+        skills:
+          type: array
+          items: {$ref: '#/components/schemas/Skill'}
+        languages:
+          type: array
+          items: {$ref: '#/components/schemas/Language'}
+    AgreedAction:
+      type: object
+      required: [text]
+      properties:
+        text: {$ref: '#/components/schemas/FreeText'}
+        proposedOwnerUserId: {$ref: '#/components/schemas/UserId'}
+        taskId: {$ref: '#/components/schemas/ObjectId'}
+    SupportRequest:
+      allOf:
+        - $ref: '#/components/schemas/ResourceMeta'
+        - type: object
+          required: [wardId, facilityId, raisedBy, problem, skill, language, shortlist, status]
+          properties:
+            wardId: {$ref: '#/components/schemas/ObjectId'}
+            facilityId: {$ref: '#/components/schemas/ObjectId'}
+            raisedBy: {$ref: '#/components/schemas/UserId'}
+            problem: {$ref: '#/components/schemas/FreeText'}
+            skill: {$ref: '#/components/schemas/Skill'}
+            language: {$ref: '#/components/schemas/Language'}
+            shortlist:
+              type: array
+              items: {$ref: '#/components/schemas/ShortlistEntry'}
+            chosenMentorId: {$ref: '#/components/schemas/ElevateRef'}
+            elevateRequestSessionId: {$ref: '#/components/schemas/ElevateRef'}
+            status: {$ref: '#/components/schemas/SupportRequestStatus'}
+            heldAt: {$ref: '#/components/schemas/Timestamp'}
+            agreedActions:
+              type: array
+              items: {$ref: '#/components/schemas/AgreedAction'}
+            planRevision: {type: integer, minimum: 1}
+    SupportRequestCreate:
+      type: object
+      required: [wardId, problem, skill, language]
+      additionalProperties: false
+      properties:
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        problem: {$ref: '#/components/schemas/FreeText'}
+        skill: {$ref: '#/components/schemas/Skill'}
+        language: {$ref: '#/components/schemas/Language'}
+    SessionRequestCreate:
+      type: object
+      required: [mentorId]
+      additionalProperties: false
+      properties:
+        mentorId: {$ref: '#/components/schemas/ElevateRef'}
+        message: {$ref: '#/components/schemas/FreeText'}
+        proposedStartAt: {$ref: '#/components/schemas/Timestamp'}
+    SupportOutcome:
+      type: object
+      required: [held, heldAt, agreedActions]
+      additionalProperties: false
+      properties:
+        held: {type: boolean, const: true}
+        heldAt: {$ref: '#/components/schemas/Timestamp'}
+        agreedActions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [text]
+            additionalProperties: false
+            properties:
+              text: {$ref: '#/components/schemas/FreeText'}
+    AgreedActionsToPlan:
+      type: object
+      required: [actions]
+      additionalProperties: false
+      properties:
+        reason: {$ref: '#/components/schemas/FreeText'}
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [index, ownerUserId, riskLevel]
+            additionalProperties: false
+            properties:
+              index: {type: integer, minimum: 0, description: Index into the request's agreedActions.}
+              ownerUserId: {$ref: '#/components/schemas/UserId'}
+              riskLevel: {$ref: '#/components/schemas/RiskLevel'}
+              dueAt: {$ref: '#/components/schemas/Timestamp'}
+
+    # ---------- oversight
+    OversightCounts:
+      type: object
+      required: [wards, wardsAssessed, completionRate, openCriticalTasks, overdueCriticalTasks, repeatedFailures, dataQualityExceptions]
+      properties:
+        wards: {type: integer, minimum: 0}
+        wardsAssessed: {type: integer, minimum: 0}
+        completionRate: {type: number, minimum: 0, maximum: 1}
+        openCriticalTasks: {type: integer, minimum: 0}
+        overdueCriticalTasks: {type: integer, minimum: 0}
+        repeatedFailures: {type: integer, minimum: 0, description: Tasks with rejectionCount ≥ 2 plus questions failed in 2 consecutive cycles.}
+        dataQualityExceptions: {type: integer, minimum: 0}
+        averageScore: {type: number}
+    OversightSummary:
+      type: object
+      required: [scope, programmeAt, cycleId, totals, byDistrict, byFacility]
+      properties:
+        scope: {$ref: '#/components/schemas/Scope'}
+        programmeAt: {$ref: '#/components/schemas/Timestamp'}
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+        totals: {$ref: '#/components/schemas/OversightCounts'}
+        byDistrict:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/OversightCounts'
+              - type: object
+                required: [districtCode]
+                properties:
+                  districtCode: {type: string, maxLength: 32}
+        byFacility:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/OversightCounts'
+              - type: object
+                required: [facilityId, name]
+                properties:
+                  facilityId: {$ref: '#/components/schemas/ObjectId'}
+                  name: {type: string, maxLength: 200}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [cycleCode, averageScore]
+            properties:
+              cycleCode: {type: string, maxLength: 16}
+              averageScore: {type: number}
+    OversightWardRow:
+      type: object
+      required: [wardId, wardName, facilityId, facilityName, districtCode, assessmentStatus, openCriticalTasks, overdueCriticalTasks, repeatedFailures]
+      properties:
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        wardName: {type: string, maxLength: 200}
+        wardType: {type: string, maxLength: 32}
+        facilityId: {$ref: '#/components/schemas/ObjectId'}
+        facilityName: {type: string, maxLength: 200}
+        districtCode: {type: string, maxLength: 32}
+        assessmentStatus: {type: string, enum: [not_started, submitted, completed, held]}
+        latestScore: {type: number}
+        baselineScore: {type: number}
+        openCriticalTasks: {type: integer, minimum: 0}
+        overdueCriticalTasks: {type: integer, minimum: 0}
+        repeatedFailures: {type: integer, minimum: 0}
+        dataQualityExceptions: {type: integer, minimum: 0}
+    DataQualityException:
+      type: object
+      required: [id, kind, detectedAt, facilityId]
+      properties:
+        id: {type: string, maxLength: 64}
+        kind: {$ref: '#/components/schemas/DataQualityExceptionKind'}
+        detectedAt: {$ref: '#/components/schemas/Timestamp'}
+        facilityId: {$ref: '#/components/schemas/ObjectId'}
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        evidenceId: {$ref: '#/components/schemas/ObjectId'}
+        relatedEvidenceIds:
+          type: array
+          items: {$ref: '#/components/schemas/ObjectId'}
+        userId: {$ref: '#/components/schemas/UserId'}
+        deviceId: {type: string, format: uuid}
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+        metric:
+          type: object
+          description: Kind-specific value, e.g. distanceM, skewSec, uploadDelayHours, oldestPendingHours.
+          additionalProperties: {type: number}
+
+    # ---------- devices
+    DeviceQueueStatusReport:
+      type: object
+      required: [oldestPendingAt, pendingCount, failedCount, reportedAt]
+      additionalProperties: false
+      properties:
+        oldestPendingAt:
+          type: ['string', 'null']
+          format: date-time
+        pendingCount: {type: integer, minimum: 0}
+        failedCount: {type: integer, minimum: 0}
+        reportedAt: {$ref: '#/components/schemas/Timestamp'}
+        appVersion: {type: string, maxLength: 32}
+    DeviceQueueStatus:
+      type: object
+      required: [deviceId, userId, pendingCount, failedCount, reportedAt, receivedAt]
+      properties:
+        deviceId: {type: string, format: uuid}
+        userId: {$ref: '#/components/schemas/UserId'}
+        oldestPendingAt:
+          type: ['string', 'null']
+          format: date-time
+        pendingCount: {type: integer, minimum: 0}
+        failedCount: {type: integer, minimum: 0}
+        reportedAt: {$ref: '#/components/schemas/Timestamp'}
+        receivedAt: {$ref: '#/components/schemas/Timestamp'}
+
+    # ---------- ledger
+    LedgerRecord:
+      type: object
+      required: [seq, at, programmeAt, actor, action, subject, correlationId, prevHash, hash]
+      properties:
+        seq: {type: integer, minimum: 1}
+        at: {$ref: '#/components/schemas/Timestamp'}
+        programmeAt: {$ref: '#/components/schemas/Timestamp'}
+        actor: {$ref: '#/components/schemas/Actor'}
+        action: {type: string, maxLength: 64, examples: [task.returned, checklist.published, scope.changed, evidence.denied, reconcile.corrected, clock.shifted]}
+        subject:
+          type: object
+          required: [type, id]
+          properties:
+            type: {$ref: '#/components/schemas/LedgerSubjectType'}
+            id: {type: string, maxLength: 64}
+        reason: {$ref: '#/components/schemas/FreeText'}
+        beforeHash: {$ref: '#/components/schemas/Sha256'}
+        afterHash: {$ref: '#/components/schemas/Sha256'}
+        correlationId: {type: string, maxLength: 64}
+        prevHash: {$ref: '#/components/schemas/Sha256'}
+        hash: {$ref: '#/components/schemas/Sha256'}
+    LedgerVerification:
+      type: object
+      required: [ok, checkedRecords, verifiedAt]
+      properties:
+        ok: {type: boolean}
+        checkedRecords: {type: integer, minimum: 0}
+        fromSeq: {type: integer, minimum: 1}
+        lastSeq: {type: integer, minimum: 0}
+        firstBrokenSeq: {type: ['integer', 'null'], minimum: 1}
+        verifiedAt: {$ref: '#/components/schemas/Timestamp'}
+
+    # ---------- health / internal
+    Health:
+      type: object
+      required: [status, service, version]
+      properties:
+        status: {type: string, enum: [ok, degraded, down]}
+        service: {type: string, enum: [edge, workflow, adapters]}
+        version: {type: string, maxLength: 32}
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, down]
+    DependencyReport:
+      type: object
+      required: [checkedAt, dependencies]
+      properties:
+        checkedAt: {$ref: '#/components/schemas/Timestamp'}
+        dependencies:
+          type: array
+          items:
+            type: object
+            required: [name, status]
+            properties:
+              name:
+                type: string
+                enum: [elevate-user, elevate-entity, elevate-samiksha, elevate-project, elevate-mentoring, elevate-scheduler, elevate-notification, kafka, mongo, minio, workflow, adapters]
+              status: {type: string, enum: [up, degraded, down]}
+              circuit: {type: string, enum: [closed, open, half_open]}
+              latencyMs: {type: number, minimum: 0}
+              affects:
+                type: array
+                description: User-facing functions affected when down.
+                items: {type: string, maxLength: 64}
+    ReconciliationResult:
+      type: object
+      required: [runAt, plansChecked, tasksChecked, corrections, failures]
+      properties:
+        runAt: {$ref: '#/components/schemas/Timestamp'}
+        plansChecked: {type: integer, minimum: 0}
+        tasksChecked: {type: integer, minimum: 0}
+        corrections: {type: integer, minimum: 0}
+        failures: {type: integer, minimum: 0}
