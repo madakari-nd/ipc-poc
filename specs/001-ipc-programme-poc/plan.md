@@ -64,7 +64,7 @@ mid-range mobile profile).
 a static secret header; the demo clock never shifts ELEVATE dates.
 
 **Scale/Scope**: pilot 15 hospitals / ~150 wards / 250 users / 7 roles; scale 150 / ~1,500 / 2,500
-(see Capacity). 9 user stories, ~30 screens, 93 API operations (83 public, 10 internal; see contracts/README.md).
+(see Capacity). 9 user stories, ~30 screens, 95 API operations (85 public, 10 internal; see contracts/README.md).
 
 ## Constitution Check
 
@@ -206,7 +206,7 @@ TypeScript, unit-testable).
 
 | Item | Why needed | Simpler alternative rejected because |
 |------|-----------|--------------------------------------|
-| Prometheus + Grafana + Alertmanager containers | NFR-003 dashboard + 5 alerts (production grade) | Logs only cannot alert on p95 or outbox depth |
+| Prometheus + Grafana + Alertmanager containers | NFR-003 dashboard + 6 alerts (production grade) | Logs only cannot alert on p95 or outbox depth |
 | Caddy for TLS | NFR-005 TLS at the entry point | Self-managed certs in Express are error-prone |
 | Backup sidecar (mongodump + MinIO mirror every 15 min) | NFR-002 RPO ≤ 15 min | Manual backups are not testable |
 | Integration/E2E on a self-hosted runner (the demo laptop) | Need real ELEVATE (Principle I), which hosted CI cannot run | Mocking ELEVATE in CI violates Principle I; hosted CI still runs lint/unit/contract/build/scans |

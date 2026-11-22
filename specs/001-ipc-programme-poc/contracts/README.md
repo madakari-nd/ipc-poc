@@ -6,7 +6,7 @@ Contract-first source of truth (Constitution Principle V) for the Programme Edge
 
 | File | What it defines |
 |------|-----------------|
-| `openapi.yaml` | OpenAPI 3.1. 83 public operations under `/ipc/v1` (plus Edge `/healthz`, `/readyz`, `/dependencies`) and 10 private operations under `/internal` (tag `internal`, private network only). 93 operations in total. |
+| `openapi.yaml` | OpenAPI 3.1. 85 public operations under `/ipc/v1` (plus Edge `/healthz`, `/readyz`, `/dependencies`) and 10 private operations under `/internal` (tag `internal`, private network only). 95 operations in total. |
 | `events/ipc.assessment.released.schema.json` | Event `ipc.assessment.released`, version 1 (JSON Schema 2020-12). |
 | `events/ipc.checklist.published.schema.json` | Event `ipc.checklist.published`, version 1 (JSON Schema 2020-12). |
 | `events/ipc.notification.delivery.schema.json` | Event `ipc.notification.delivery`, version 1 (JSON Schema 2020-12). |
@@ -102,79 +102,81 @@ Every 403 is written to the ledger (the Edge uses `internalAppendLedger`). Held 
 | 22 | POST | `/ipc/v1/admin/checklists/{checklistVersionId}/publication` | `publishChecklistVersion` | STATE_ADMIN | FR-005, FR-006, FR-027, FR-031, US1, US2 |
 | 23 | GET | `/ipc/v1/admin/risk-defaults` | `listRiskDefaults` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER | FR-006, US1 |
 | 24 | PUT | `/ipc/v1/admin/risk-defaults/{riskLevel}` | `setRiskDefault` | STATE_ADMIN | FR-006, FR-031, US1 |
-| 25 | GET | `/ipc/v1/admin/escalation-rules` | `listEscalationRules` | STATE_ADMIN, DISTRICT_QM | FR-020, US5 |
-| 26 | POST | `/ipc/v1/admin/escalation-rules` | `createEscalationRule` | STATE_ADMIN | FR-020, FR-031, US1, US5 |
-| 27 | PATCH | `/ipc/v1/admin/escalation-rules/{ruleCode}` | `updateEscalationRule` | STATE_ADMIN | FR-020, FR-031, US5 |
-| 28 | GET | `/ipc/v1/demo/clock` | `getDemoClock` | ANY_AUTHENTICATED | FR-038, US5, US7 |
-| 29 | PUT | `/ipc/v1/demo/clock` | `setDemoClock` | STATE_ADMIN | FR-038, FR-031, US5, US7 |
-| 30 | POST | `/ipc/v1/demo/clock/reset` | `resetDemoClock` | STATE_ADMIN | FR-038, FR-031 |
-| 31 | POST | `/ipc/v1/demo/escalation-sweep` | `runEscalationSweepNow` | STATE_ADMIN | FR-020, FR-038, US5 |
-| 32 | GET | `/ipc/v1/assessments` | `listAssessments` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-007, FR-010, FR-024a, FR-028, US2, US7, US9 |
-| 33 | POST | `/ipc/v1/assessments` | `startAssessment` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-007, FR-010, US2 |
-| 34 | GET | `/ipc/v1/assessments/{assessmentId}` | `getAssessment` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-005, FR-010, FR-024a, FR-028, US2, US7, US9 |
-| 35 | GET | `/ipc/v1/assessments/{assessmentId}/form-bundle` | `getFormBundle` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-005, FR-007, FR-010, US2 |
-| 36 | POST | `/ipc/v1/assessments/{assessmentId}/submission` | `submitAssessment` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-007, FR-008, FR-009, FR-010, FR-028, FR-030, FR-032, US2, US7, US9 |
-| 37 | PUT | `/ipc/v1/assessments/{assessmentId}/baseline` | `setAssessmentBaseline` | IPC_OFFICER | FR-010, FR-024, FR-031, US7 |
-| 38 | POST | `/ipc/v1/assessments/{assessmentId}/release` | `releaseAssessment` | DISTRICT_QM | FR-024a, FR-027, FR-031, US7 |
-| 39 | GET | `/ipc/v1/assessments/{assessmentId}/comparison` | `getAssessmentComparison` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-024, FR-024a, US7 |
-| 40 | GET | `/ipc/v1/wards/{wardId}/trend` | `getWardTrend` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-024, FR-025, US7, US8 |
-| 41 | POST | `/ipc/v1/evidence/intents` | `createEvidenceIntent` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-008, FR-009, FR-028, FR-029, FR-030, US2, US4, US9 |
-| 42 | POST | `/ipc/v1/evidence/{evidenceId}/upload-url` | `renewEvidenceUploadUrl` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-009, FR-029, US2 |
-| 43 | POST | `/ipc/v1/evidence/{evidenceId}/confirmation` | `confirmEvidence` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-008, FR-009, FR-030, US2, US4 |
-| 44 | GET | `/ipc/v1/evidence/{evidenceId}` | `getEvidence` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR | FR-008, FR-028, US2, US4, US9 |
-| 45 | GET | `/ipc/v1/evidence/{evidenceId}/download-link` | `getEvidenceDownloadLink` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR | FR-028, FR-029, US4, US7, US9 |
-| 46 | POST | `/ipc/v1/evidence/{evidenceId}/patient-data-deletion` | `deletePatientDataMedia` | WARD_SUPERVISOR, IPC_OFFICER, DISTRICT_QM | FR-031, FR-032, US4, US9 |
-| 47 | GET | `/ipc/v1/plans` | `listPlans` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-011, FR-012, FR-028, US3, US7, US9 |
-| 48 | GET | `/ipc/v1/plans/{planId}` | `getPlan` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-011, FR-012, FR-018, FR-019, FR-028, US3, US7, US9 |
-| 49 | PATCH | `/ipc/v1/plans/{planId}` | `updateDraftPlan` | IPC_OFFICER | FR-012, FR-013, FR-016, US3 |
-| 50 | POST | `/ipc/v1/plans/{planId}/approval` | `approvePlan` | IPC_OFFICER | FR-012, FR-018a, FR-027, FR-031, US3 |
-| 51 | GET | `/ipc/v1/plans/{planId}/revisions` | `listPlanRevisions` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-017, FR-018, FR-023, US3, US6, US7 |
-| 52 | POST | `/ipc/v1/plans/{planId}/revisions` | `revisePlan` | IPC_OFFICER | FR-015, FR-017, FR-027, FR-031, US3 |
-| 53 | GET | `/ipc/v1/tasks` | `listTasks` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR | FR-013, FR-025, FR-028, US1, US4, US9 |
-| 54 | GET | `/ipc/v1/tasks/{taskId}` | `getTask` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR | FR-013, FR-028, US4, US5, US7, US9 |
-| 55 | POST | `/ipc/v1/tasks/{taskId}/start` | `startTask` | FRONTLINE, WARD_SUPERVISOR | FR-013, FR-016, FR-030, US4 |
-| 56 | POST | `/ipc/v1/tasks/{taskId}/evidence-submission` | `submitTaskEvidence` | FRONTLINE, WARD_SUPERVISOR | FR-008, FR-009, FR-013, FR-016, FR-027, FR-030, US4 |
-| 57 | POST | `/ipc/v1/tasks/{taskId}/acceptance` | `acceptTask` | WARD_SUPERVISOR | FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4 |
-| 58 | POST | `/ipc/v1/tasks/{taskId}/return` | `returnTask` | WARD_SUPERVISOR | FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5 |
-| 59 | POST | `/ipc/v1/tasks/{taskId}/validation` | `validateTask` | IPC_OFFICER, DISTRICT_QM | FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4 |
-| 60 | POST | `/ipc/v1/tasks/{taskId}/validation-return` | `returnTaskFromValidation` | IPC_OFFICER, DISTRICT_QM | FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5 |
-| 61 | POST | `/ipc/v1/tasks/{taskId}/reassignment` | `reassignTask` | WARD_SUPERVISOR | FR-002, FR-013, FR-016, FR-027, FR-031, US1, US4 |
-| 62 | PUT | `/ipc/v1/tasks/{taskId}/blocked-flag` | `setTaskBlockedFlag` | WARD_SUPERVISOR | FR-013, FR-016, FR-031, US5 |
-| 63 | POST | `/ipc/v1/tasks/{taskId}/reopening` | `reopenTask` | IPC_OFFICER | FR-015, FR-017, FR-031, US4 |
-| 64 | GET | `/ipc/v1/tasks/{taskId}/history` | `getTaskHistory` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR | FR-013, FR-014, FR-031, US4, US5, US7, US9 |
-| 65 | GET | `/ipc/v1/escalations` | `listEscalations` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR | FR-020, FR-028, US5 |
-| 66 | POST | `/ipc/v1/tasks/{taskId}/escalations` | `raiseManualEscalation` | WARD_SUPERVISOR | FR-020, FR-021, FR-027, FR-031, US5 |
-| 67 | GET | `/ipc/v1/support-requests` | `listSupportRequests` | DISTRICT_QM, IPC_OFFICER, MENTOR, STATE_ADMIN | FR-022, FR-028, US6 |
-| 68 | POST | `/ipc/v1/support-requests` | `createSupportRequest` | IPC_OFFICER, DISTRICT_QM | FR-022, FR-031, FR-032, US6 |
-| 69 | GET | `/ipc/v1/support-requests/{supportRequestId}/shortlist` | `getMentorShortlist` | IPC_OFFICER, DISTRICT_QM | FR-022, US6 |
-| 70 | POST | `/ipc/v1/support-requests/{supportRequestId}/session-request` | `requestMentorSession` | IPC_OFFICER, DISTRICT_QM | FR-022, FR-031, US6 |
-| 71 | POST | `/ipc/v1/support-requests/{supportRequestId}/outcome` | `recordSupportOutcome` | MENTOR | FR-022, FR-031, FR-032, US6 |
-| 72 | POST | `/ipc/v1/support-requests/{supportRequestId}/plan-actions` | `addAgreedActionsToPlan` | IPC_OFFICER, DISTRICT_QM | FR-017, FR-023, FR-027, FR-031, US6 |
-| 73 | GET | `/ipc/v1/oversight/summary` | `getOversightSummary` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER | FR-025, FR-028, US8, US9 |
-| 74 | GET | `/ipc/v1/oversight/wards` | `listOversightWards` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER | FR-025, FR-028, US8 |
-| 75 | GET | `/ipc/v1/oversight/data-quality-exceptions` | `listDataQualityExceptions` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR | FR-026, FR-037, US2, US8 |
-| 76 | GET | `/ipc/v1/notifications` | `listNotifications` | ANY_AUTHENTICATED | FR-021, US5 |
-| 77 | POST | `/ipc/v1/notifications/{notificationId}/read` | `markNotificationRead` | ANY_AUTHENTICATED | FR-021, US5 |
-| 78 | PUT | `/ipc/v1/devices/{deviceId}/queue-status` | `reportDeviceQueueStatus` | FRONTLINE, WARD_SUPERVISOR, IPC_OFFICER, EXTERNAL_AUDITOR | FR-026, FR-037, US2, US4 |
-| 79 | GET | `/ipc/v1/ledger/{subjectType}/{subjectId}` | `getEntityLedger` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-019, FR-024a, FR-031, US1, US7, US9 |
-| 80 | GET | `/ipc/v1/admin/ledger/verification` | `verifyLedger` | STATE_ADMIN | FR-031, US9 |
-| 81 | GET | `/healthz` | `edgeHealthz` | PUBLIC | FR-034 |
-| 82 | GET | `/readyz` | `edgeReadyz` | PUBLIC | FR-034 |
-| 83 | GET | `/dependencies` | `edgeDependencies` | ANY_AUTHENTICATED | FR-036 |
-| 84 | GET | `/internal/scopes/{userId}` | `internalGetEffectiveScope` | SERVICE | FR-003, FR-028, US9 |
-| 85 | POST | `/internal/escalations/sweep` | `internalEscalationSweep` | SCHEDULER | FR-020, FR-021, FR-027, FR-034, US5, US9 |
-| 86 | POST | `/internal/escalations/run-now` | `internalEscalationRunNow` | SERVICE | FR-020, FR-038, US5 |
-| 87 | POST | `/internal/reconciliation/run` | `internalRunReconciliation` | SERVICE | FR-018a, FR-019, FR-031 |
-| 88 | POST | `/internal/ledger/records` | `internalAppendLedger` | SERVICE | FR-031, FR-032, US9 |
-| 89 | PUT | `/internal/assessments/{elevateSubmissionId}/context` | `internalUpsertAssessmentContext` | SERVICE | FR-010, FR-032, US2 |
-| 90 | GET | `/internal/evidence/data-quality` | `edgeInternalEvidenceDQ` | SERVICE | FR-026, US8 |
-| 91 | GET | `/internal/healthz` | `workflowHealthz` | PUBLIC | - (ops) |
-| 92 | GET | `/internal/readyz` | `workflowReadyz` | PUBLIC | - (ops) |
-| 93 | GET | `/internal/dependencies` | `workflowDependencies` | SERVICE | - (ops) |
+| 25 | GET | `/ipc/v1/admin/retention-policy` | `getRetentionPolicy` | STATE_ADMIN | NFR-010, FR-031 |
+| 26 | PUT | `/ipc/v1/admin/retention-policy` | `setRetentionPolicy` | STATE_ADMIN | NFR-010, FR-031 |
+| 27 | GET | `/ipc/v1/admin/escalation-rules` | `listEscalationRules` | STATE_ADMIN, DISTRICT_QM | FR-020, US5 |
+| 28 | POST | `/ipc/v1/admin/escalation-rules` | `createEscalationRule` | STATE_ADMIN | FR-020, FR-031, US1, US5 |
+| 29 | PATCH | `/ipc/v1/admin/escalation-rules/{ruleCode}` | `updateEscalationRule` | STATE_ADMIN | FR-020, FR-031, US5 |
+| 30 | GET | `/ipc/v1/demo/clock` | `getDemoClock` | ANY_AUTHENTICATED | FR-038, US5, US7 |
+| 31 | PUT | `/ipc/v1/demo/clock` | `setDemoClock` | STATE_ADMIN | FR-038, FR-031, US5, US7 |
+| 32 | POST | `/ipc/v1/demo/clock/reset` | `resetDemoClock` | STATE_ADMIN | FR-038, FR-031 |
+| 33 | POST | `/ipc/v1/demo/escalation-sweep` | `runEscalationSweepNow` | STATE_ADMIN | FR-020, FR-038, US5 |
+| 34 | GET | `/ipc/v1/assessments` | `listAssessments` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-007, FR-010, FR-024a, FR-028, US2, US7, US9 |
+| 35 | POST | `/ipc/v1/assessments` | `startAssessment` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-007, FR-010, US2 |
+| 36 | GET | `/ipc/v1/assessments/{assessmentId}` | `getAssessment` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-005, FR-010, FR-024a, FR-028, US2, US7, US9 |
+| 37 | GET | `/ipc/v1/assessments/{assessmentId}/form-bundle` | `getFormBundle` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-005, FR-007, FR-010, US2 |
+| 38 | POST | `/ipc/v1/assessments/{assessmentId}/submission` | `submitAssessment` | IPC_OFFICER, EXTERNAL_AUDITOR | FR-007, FR-008, FR-009, FR-010, FR-028, FR-030, FR-032, US2, US7, US9 |
+| 39 | PUT | `/ipc/v1/assessments/{assessmentId}/baseline` | `setAssessmentBaseline` | IPC_OFFICER | FR-010, FR-024, FR-031, US7 |
+| 40 | POST | `/ipc/v1/assessments/{assessmentId}/release` | `releaseAssessment` | DISTRICT_QM | FR-024a, FR-027, FR-031, US7 |
+| 41 | GET | `/ipc/v1/assessments/{assessmentId}/comparison` | `getAssessmentComparison` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-024, FR-024a, US7 |
+| 42 | GET | `/ipc/v1/wards/{wardId}/trend` | `getWardTrend` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-024, FR-025, US7, US8 |
+| 43 | POST | `/ipc/v1/evidence/intents` | `createEvidenceIntent` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-008, FR-009, FR-028, FR-029, FR-030, US2, US4, US9 |
+| 44 | POST | `/ipc/v1/evidence/{evidenceId}/upload-url` | `renewEvidenceUploadUrl` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-009, FR-029, US2 |
+| 45 | POST | `/ipc/v1/evidence/{evidenceId}/confirmation` | `confirmEvidence` | IPC_OFFICER, EXTERNAL_AUDITOR, WARD_SUPERVISOR, FRONTLINE | FR-008, FR-009, FR-030, US2, US4 |
+| 46 | GET | `/ipc/v1/evidence/{evidenceId}` | `getEvidence` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR | FR-008, FR-028, US2, US4, US9 |
+| 47 | GET | `/ipc/v1/evidence/{evidenceId}/download-link` | `getEvidenceDownloadLink` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR, MENTOR | FR-028, FR-029, US4, US7, US9 |
+| 48 | POST | `/ipc/v1/evidence/{evidenceId}/patient-data-deletion` | `deletePatientDataMedia` | WARD_SUPERVISOR, IPC_OFFICER, DISTRICT_QM | FR-031, FR-032, US4, US9 |
+| 49 | GET | `/ipc/v1/plans` | `listPlans` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-011, FR-012, FR-028, US3, US7, US9 |
+| 50 | GET | `/ipc/v1/plans/{planId}` | `getPlan` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-011, FR-012, FR-018, FR-019, FR-028, US3, US7, US9 |
+| 51 | PATCH | `/ipc/v1/plans/{planId}` | `updateDraftPlan` | IPC_OFFICER | FR-012, FR-013, FR-016, US3 |
+| 52 | POST | `/ipc/v1/plans/{planId}/approval` | `approvePlan` | IPC_OFFICER | FR-012, FR-018a, FR-027, FR-031, US3 |
+| 53 | GET | `/ipc/v1/plans/{planId}/revisions` | `listPlanRevisions` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, MENTOR, EXTERNAL_AUDITOR | FR-017, FR-018, FR-023, US3, US6, US7 |
+| 54 | POST | `/ipc/v1/plans/{planId}/revisions` | `revisePlan` | IPC_OFFICER | FR-015, FR-017, FR-027, FR-031, US3 |
+| 55 | GET | `/ipc/v1/tasks` | `listTasks` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR | FR-013, FR-025, FR-028, US1, US4, US9 |
+| 56 | GET | `/ipc/v1/tasks/{taskId}` | `getTask` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, MENTOR, EXTERNAL_AUDITOR | FR-013, FR-028, US4, US5, US7, US9 |
+| 57 | POST | `/ipc/v1/tasks/{taskId}/start` | `startTask` | FRONTLINE, WARD_SUPERVISOR | FR-013, FR-016, FR-030, US4 |
+| 58 | POST | `/ipc/v1/tasks/{taskId}/evidence-submission` | `submitTaskEvidence` | FRONTLINE, WARD_SUPERVISOR | FR-008, FR-009, FR-013, FR-016, FR-027, FR-030, US4 |
+| 59 | POST | `/ipc/v1/tasks/{taskId}/acceptance` | `acceptTask` | WARD_SUPERVISOR | FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4 |
+| 60 | POST | `/ipc/v1/tasks/{taskId}/return` | `returnTask` | WARD_SUPERVISOR | FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5 |
+| 61 | POST | `/ipc/v1/tasks/{taskId}/validation` | `validateTask` | IPC_OFFICER, DISTRICT_QM | FR-013, FR-014, FR-016, FR-019, FR-027, FR-031, US4 |
+| 62 | POST | `/ipc/v1/tasks/{taskId}/validation-return` | `returnTaskFromValidation` | IPC_OFFICER, DISTRICT_QM | FR-013, FR-014, FR-016, FR-020, FR-027, FR-031, US4, US5 |
+| 63 | POST | `/ipc/v1/tasks/{taskId}/reassignment` | `reassignTask` | WARD_SUPERVISOR | FR-002, FR-013, FR-016, FR-027, FR-031, US1, US4 |
+| 64 | PUT | `/ipc/v1/tasks/{taskId}/blocked-flag` | `setTaskBlockedFlag` | WARD_SUPERVISOR | FR-013, FR-016, FR-031, US5 |
+| 65 | POST | `/ipc/v1/tasks/{taskId}/reopening` | `reopenTask` | IPC_OFFICER | FR-015, FR-017, FR-031, US4 |
+| 66 | GET | `/ipc/v1/tasks/{taskId}/history` | `getTaskHistory` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, FRONTLINE, EXTERNAL_AUDITOR | FR-013, FR-014, FR-031, US4, US5, US7, US9 |
+| 67 | GET | `/ipc/v1/escalations` | `listEscalations` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR | FR-020, FR-028, US5 |
+| 68 | POST | `/ipc/v1/tasks/{taskId}/escalations` | `raiseManualEscalation` | WARD_SUPERVISOR | FR-020, FR-021, FR-027, FR-031, US5 |
+| 69 | GET | `/ipc/v1/support-requests` | `listSupportRequests` | DISTRICT_QM, IPC_OFFICER, MENTOR, STATE_ADMIN | FR-022, FR-028, US6 |
+| 70 | POST | `/ipc/v1/support-requests` | `createSupportRequest` | IPC_OFFICER, DISTRICT_QM | FR-022, FR-031, FR-032, US6 |
+| 71 | GET | `/ipc/v1/support-requests/{supportRequestId}/shortlist` | `getMentorShortlist` | IPC_OFFICER, DISTRICT_QM | FR-022, US6 |
+| 72 | POST | `/ipc/v1/support-requests/{supportRequestId}/session-request` | `requestMentorSession` | IPC_OFFICER, DISTRICT_QM | FR-022, FR-031, US6 |
+| 73 | POST | `/ipc/v1/support-requests/{supportRequestId}/outcome` | `recordSupportOutcome` | MENTOR | FR-022, FR-031, FR-032, US6 |
+| 74 | POST | `/ipc/v1/support-requests/{supportRequestId}/plan-actions` | `addAgreedActionsToPlan` | IPC_OFFICER, DISTRICT_QM | FR-017, FR-023, FR-027, FR-031, US6 |
+| 75 | GET | `/ipc/v1/oversight/summary` | `getOversightSummary` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER | FR-025, FR-028, US8, US9 |
+| 76 | GET | `/ipc/v1/oversight/wards` | `listOversightWards` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER | FR-025, FR-028, US8 |
+| 77 | GET | `/ipc/v1/oversight/data-quality-exceptions` | `listDataQualityExceptions` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR | FR-026, FR-037, US2, US8 |
+| 78 | GET | `/ipc/v1/notifications` | `listNotifications` | ANY_AUTHENTICATED | FR-021, US5 |
+| 79 | POST | `/ipc/v1/notifications/{notificationId}/read` | `markNotificationRead` | ANY_AUTHENTICATED | FR-021, US5 |
+| 80 | PUT | `/ipc/v1/devices/{deviceId}/queue-status` | `reportDeviceQueueStatus` | FRONTLINE, WARD_SUPERVISOR, IPC_OFFICER, EXTERNAL_AUDITOR | FR-026, FR-037, US2, US4 |
+| 81 | GET | `/ipc/v1/ledger/{subjectType}/{subjectId}` | `getEntityLedger` | STATE_ADMIN, DISTRICT_QM, IPC_OFFICER, WARD_SUPERVISOR, EXTERNAL_AUDITOR | FR-019, FR-024a, FR-031, US1, US7, US9 |
+| 82 | GET | `/ipc/v1/admin/ledger/verification` | `verifyLedger` | STATE_ADMIN | FR-031, US9 |
+| 83 | GET | `/healthz` | `edgeHealthz` | PUBLIC | FR-034 |
+| 84 | GET | `/readyz` | `edgeReadyz` | PUBLIC | FR-034 |
+| 85 | GET | `/dependencies` | `edgeDependencies` | ANY_AUTHENTICATED | FR-036 |
+| 86 | GET | `/internal/scopes/{userId}` | `internalGetEffectiveScope` | SERVICE | FR-003, FR-028, US9 |
+| 87 | POST | `/internal/escalations/sweep` | `internalEscalationSweep` | SCHEDULER | FR-020, FR-021, FR-027, FR-034, US5, US9 |
+| 88 | POST | `/internal/escalations/run-now` | `internalEscalationRunNow` | SERVICE | FR-020, FR-038, US5 |
+| 89 | POST | `/internal/reconciliation/run` | `internalRunReconciliation` | SERVICE | FR-018a, FR-019, FR-031 |
+| 90 | POST | `/internal/ledger/records` | `internalAppendLedger` | SERVICE | FR-031, FR-032, US9 |
+| 91 | PUT | `/internal/assessments/{elevateSubmissionId}/context` | `internalUpsertAssessmentContext` | SERVICE | FR-010, FR-032, US2 |
+| 92 | GET | `/internal/evidence/data-quality` | `edgeInternalEvidenceDQ` | SERVICE | FR-026, US8 |
+| 93 | GET | `/internal/healthz` | `workflowHealthz` | PUBLIC | - (ops) |
+| 94 | GET | `/internal/readyz` | `workflowReadyz` | PUBLIC | - (ops) |
+| 95 | GET | `/internal/dependencies` | `workflowDependencies` | SERVICE | - (ops) |
 
 ## Requirement → operations (check)
 
-Every FR-001..FR-040 (with FR-018a, FR-024a) and US1..US9 is listed with the operations that serve it.
+Every FR-001..FR-040 (with FR-018a, FR-024a), US1..US9 and NFR-010 (the one NFR with its own operations) is listed with the operations that serve it.
 
 | Requirement | Ops | Operations | Note |
 |-------------|-----|-----------|------|
@@ -210,7 +212,7 @@ Every FR-001..FR-040 (with FR-018a, FR-024a) and US1..US9 is listed with the ope
 | FR-028 | 18 | `getMe`, `listFacilities`, `createScopeAssignment`, `listAssessments`, `getAssessment`, `submitAssessment`, `createEvidenceIntent`, `getEvidence`, `getEvidenceDownloadLink`, `listPlans`, `getPlan`, `listTasks`, `getTask`, `listEscalations`, `listSupportRequests`, `getOversightSummary`, `listOversightWards`, `internalGetEffectiveScope` |  |
 | FR-029 | 3 | `createEvidenceIntent`, `renewEvidenceUploadUrl`, `getEvidenceDownloadLink` |  |
 | FR-030 | 5 | `submitAssessment`, `createEvidenceIntent`, `confirmEvidence`, `startTask`, `submitTaskEvidence` |  |
-| FR-031 | 36 | `updateProgramme`, `createCycle`, `updateCycle`, `createImport`, `createScopeAssignment`, `updateScopeAssignment`, `createChecklistDraft`, `updateChecklistDraft`, `publishChecklistVersion`, `setRiskDefault`, `createEscalationRule`, `updateEscalationRule`, `setDemoClock`, `resetDemoClock`, `setAssessmentBaseline`, `releaseAssessment`, `deletePatientDataMedia`, `approvePlan`, `revisePlan`, `acceptTask`, `returnTask`, `validateTask`, `returnTaskFromValidation`, `reassignTask`, `setTaskBlockedFlag`, `reopenTask`, `getTaskHistory`, `raiseManualEscalation`, `createSupportRequest`, `requestMentorSession`, `recordSupportOutcome`, `addAgreedActionsToPlan`, `getEntityLedger`, `verifyLedger`, `internalRunReconciliation`, `internalAppendLedger` |  |
+| FR-031 | 38 | `updateProgramme`, `createCycle`, `updateCycle`, `createImport`, `createScopeAssignment`, `updateScopeAssignment`, `createChecklistDraft`, `updateChecklistDraft`, `publishChecklistVersion`, `setRiskDefault`, `getRetentionPolicy`, `setRetentionPolicy`, `createEscalationRule`, `updateEscalationRule`, `setDemoClock`, `resetDemoClock`, `setAssessmentBaseline`, `releaseAssessment`, `deletePatientDataMedia`, `approvePlan`, `revisePlan`, `acceptTask`, `returnTask`, `validateTask`, `returnTaskFromValidation`, `reassignTask`, `setTaskBlockedFlag`, `reopenTask`, `getTaskHistory`, `raiseManualEscalation`, `createSupportRequest`, `requestMentorSession`, `recordSupportOutcome`, `addAgreedActionsToPlan`, `getEntityLedger`, `verifyLedger`, `internalRunReconciliation`, `internalAppendLedger` |  |
 | FR-032 | 6 | `submitAssessment`, `deletePatientDataMedia`, `createSupportRequest`, `recordSupportOutcome`, `internalAppendLedger`, `internalUpsertAssessmentContext` |  |
 | FR-033 | 3 | `login`, `logout`, `getMe` |  |
 | FR-034 | 4 | `login`, `edgeHealthz`, `edgeReadyz`, `internalEscalationSweep` | Cross-cutting: every operation can answer 429 `RATE_LIMITED`; `/internal` is not routed by the Edge (network topology, not an operation). |
@@ -229,13 +231,14 @@ Every FR-001..FR-040 (with FR-018a, FR-024a) and US1..US9 is listed with the ope
 | US7 | 19 | `getHome`, `listCycles`, `getChecklistVersion`, `getDemoClock`, `setDemoClock`, `listAssessments`, `getAssessment`, `submitAssessment`, `setAssessmentBaseline`, `releaseAssessment`, `getAssessmentComparison`, `getWardTrend`, `getEvidenceDownloadLink`, `listPlans`, `getPlan`, `listPlanRevisions`, `getTask`, `getTaskHistory`, `getEntityLedger` |  |
 | US8 | 6 | `getHome`, `getWardTrend`, `getOversightSummary`, `listOversightWards`, `listDataQualityExceptions`, `edgeInternalEvidenceDQ` |  |
 | US9 | 23 | `login`, `getMe`, `listFacilities`, `listScopeAssignments`, `createScopeAssignment`, `listAssessments`, `getAssessment`, `submitAssessment`, `createEvidenceIntent`, `getEvidence`, `getEvidenceDownloadLink`, `deletePatientDataMedia`, `listPlans`, `getPlan`, `listTasks`, `getTask`, `getTaskHistory`, `getOversightSummary`, `getEntityLedger`, `verifyLedger`, `internalGetEffectiveScope`, `internalEscalationSweep`, `internalAppendLedger` |  |
+| NFR-010 | 2 | `getRetentionPolicy`, `setRetentionPolicy` |  |
 
 ## Requirements without an API
 
 - **FR-039** (seed, reset, demo script): delivered as CLI scripts and a written script, not as HTTP operations, so the demo state cannot be reset through the public entry point.
 - **FR-040** (test data separate from demo data): an environment-profile property (separate database, bucket, topic suffix, consumer group and ELEVATE organisation), not an operation.
 
-Partly UI or infrastructure (have supporting operations, see notes above): FR-034 (internal routes unreachable = network topology), FR-035 (translations), FR-036 (role homes), FR-011 and FR-019 (background consumers/jobs), FR-027 (events). Non-functional requirements (NFR-001..012) are out of the coverage table; the health operations serve NFR-004.
+Partly UI or infrastructure (have supporting operations, see notes above): FR-034 (internal routes unreachable = network topology), FR-035 (translations), FR-036 (role homes), FR-011 and FR-019 (background consumers/jobs), FR-027 (events). Other non-functional requirements are out of the coverage table; NFR-010 (retention) is covered by `getRetentionPolicy` / `setRetentionPolicy`, and the health operations serve NFR-004.
 
 ## Validation
 

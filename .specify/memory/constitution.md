@@ -1,6 +1,6 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 (MINOR: added Principle XIII
+- Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 → 1.1.1 (latest PATCH: readiness wording). 1.1.0 was MINOR: added Principle XIII
   Almost Production Grade, per user directive). 1.0.1 was PATCH: data-pipeline removed from Principle I
   list — POC oversight uses officer-web screens; scheduler callback auth = static shared secret)
 - Principles: I–XII defined; XIII added in 1.1.0; VI readiness wording clarified in 1.1.1

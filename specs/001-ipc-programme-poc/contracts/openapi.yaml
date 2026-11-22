@@ -761,6 +761,60 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+  /ipc/v1/admin/retention-policy:
+    get:
+      tags: [admin]
+      operationId: getRetentionPolicy
+      summary: Data retention policy (evidence, audit, other records)
+      x-roles: [STATE_ADMIN]
+      x-requirements: [NFR-010, FR-031]
+      responses:
+        '200':
+          description: Current policy.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RetentionPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+    put:
+      tags: [admin]
+      operationId: setRetentionPolicy
+      summary: Change retention periods or purge mode
+      description: |
+        Defaults per proposal A6 (evidence 3 years after plan closure, audit 7 years, other records
+        5 years after programme end). The POC runs purges in `dry_run` mode. Writes the ledger action
+        `retention.changed` (subject `retention_policy`) with before/after fingerprints in the same
+        transaction. Deletion of patient-showing media is not governed here (FR-032, immediate).
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [STATE_ADMIN]
+      x-requirements: [NFR-010, FR-031]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetentionPolicyUpdate'}
+      responses:
+        '200':
+          description: Saved policy.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RetentionPolicy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/admin/escalation-rules:
     get:
       tags: [admin]
@@ -3034,7 +3088,7 @@ components:
       enum: [MEETS_STANDARD, MEETS_STANDARD_WITH_NOTE, EVIDENCE_UNCLEAR, EVIDENCE_INCOMPLETE, WRONG_LOCATION_OR_ITEM, STANDARD_NOT_MET, PATIENT_DATA_VISIBLE, OTHER]
     LedgerSubjectType:
       type: string
-      enum: [programme, facility, ward, cycle, scope_assignment, checklist_version, risk_default, escalation_rule, assessment, evidence, plan, task, escalation, support_request, clock, import_job]
+      enum: [programme, facility, ward, cycle, scope_assignment, checklist_version, risk_default, escalation_rule, assessment, evidence, plan, task, escalation, support_request, clock, import_job, retention_policy]
     DataQualityExceptionKind:
       type: string
       enum: [PHOTO_NO_GPS, GPS_FAR_FROM_FACILITY, DEVICE_CLOCK_SKEW, LATE_UPLOAD, DUPLICATE_PHOTO_ACROSS_WARDS, NO_BASELINE, STALE_DEVICE_QUEUE]
@@ -3569,6 +3623,27 @@ components:
         dueDays: {type: integer, minimum: 1, maximum: 365}
         evidenceRule: {$ref: '#/components/schemas/EvidenceRule'}
         secondValidation: {type: boolean}
+        reason: {$ref: '#/components/schemas/FreeText'}
+    RetentionPolicy:
+      type: object
+      required: [evidenceYearsAfterPlanClosure, auditYears, otherYearsAfterProgrammeEnd, purgeMode, v, updatedAt]
+      properties:
+        evidenceYearsAfterPlanClosure: {type: integer, minimum: 1, maximum: 50, default: 3}
+        auditYears: {type: integer, minimum: 1, maximum: 50, default: 7}
+        otherYearsAfterProgrammeEnd: {type: integer, minimum: 1, maximum: 50, default: 5}
+        purgeMode: {type: string, enum: [dry_run, enforce], default: dry_run, description: The POC uses dry_run.}
+        updatedBy: {$ref: '#/components/schemas/UserId'}
+        updatedAt: {$ref: '#/components/schemas/Timestamp'}
+        v: {type: integer, minimum: 0}
+    RetentionPolicyUpdate:
+      type: object
+      required: [evidenceYearsAfterPlanClosure, auditYears, otherYearsAfterProgrammeEnd, purgeMode]
+      additionalProperties: false
+      properties:
+        evidenceYearsAfterPlanClosure: {type: integer, minimum: 1, maximum: 50}
+        auditYears: {type: integer, minimum: 1, maximum: 50}
+        otherYearsAfterProgrammeEnd: {type: integer, minimum: 1, maximum: 50}
+        purgeMode: {type: string, enum: [dry_run, enforce]}
         reason: {$ref: '#/components/schemas/FreeText'}
     EscalationCondition:
       type: object

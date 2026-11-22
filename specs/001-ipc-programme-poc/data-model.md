@@ -155,6 +155,11 @@ null + `gpsUnavailable`, `uploadedBy`, `facilityId`, `wardId`, `link` {type: tas
 id}, `state` (intent | uploaded | confirmed | rejected | deleted_patient_data),
 `deletedAt?`, `deletedBy?` (content removed, metadata kept).
 
+### PurgeListEntry (edge)
+`objectKey`, `deletedAt`, `deletedBy`, `reason` (patient_data). Written by the evidence locker
+when patient-data media is deleted; the backup sidecar reads it and removes the key from every
+mirror copy (FR-032).
+
 ### IdempotencyRecord (edge)
 `key` (UUID), `userId`, `method`, `path`, `requestHash`, `status`, `responseBody`, `createdAt`
 (TTL 7 days). Same key + different requestHash → 422 `IDEMPOTENCY_KEY_REUSED`.
