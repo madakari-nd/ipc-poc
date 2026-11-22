@@ -643,8 +643,7 @@ alter one record directly in storage and confirm verification reports it.
 - ELEVATE's meeting service is off locally, so mentoring sessions are agreed through ELEVATE
   session requests and their outcome is recorded in the programme layer.
 - Where ELEVATE needs configuration for a capability the POC uses (for example a storage bucket for
-  bulk user upload or file links, the email channel, mentoring profile attributes, OTP for admin
-  roles), the POC sets it through ELEVATE's own configuration (CONFIGURE mode), never by code
+  bulk user upload or file links, the email channel, mentoring profile attributes), the POC sets it through ELEVATE's own configuration (CONFIGURE mode), never by code
   change. If a capability cannot be configured locally, the POC uses ELEVATE's per-record API
   instead of the bulk one and records the substitution.
 - External partner systems are not available for a POC, so they are represented by stand-ins at
@@ -661,7 +660,9 @@ alter one record directly in storage and confirm verification reports it.
   Kannada the third (partly translated). Changing them is a translation-file change.
 - AI services (gateway, evidence analysis, Saathi) are not in the POC; the pilot has no AI on
   hospital data.
-- Demo user passwords come from a local secrets file excluded from version control.
+- Demo user passwords come from a local secrets file excluded from version control. The running
+  ELEVATE user image supports password login only (research E1); OTP, including OTP for admin
+  roles (proposal 10.1), is shown as a pilot upgrade, not built in the POC.
 - The tamper-evident (chained) audit history is built in the POC even though the proposal phases
   it to scale-up, because it is cheap and demonstrable.
 - Quality bar is "almost production grade" (user, 2026-11-22): the POC is built and operated as
