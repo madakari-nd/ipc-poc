@@ -1,0 +1,1716 @@
+NavaDhiti proposal to ShikshaLokam
+
+Adapting and implementing ELEVATE for the
+Hospital Infection Prevention and Quality
+Improvement Programme
+Prepared by NavaDhiti (ELEVATE implementation partner)              |   For review by Vijayashree,
+ShikshaLokam | 13 November 2026 | Version 2.0
+
+ShikshaLokam's own programmes differ from this one. To show how NavaDhiti understands,
+adapts and implements ELEVATE, we took a representative state health case and worked it
+through end to end, from requirements to a 12-week pilot plan. NavaDhiti's engineers read
+the current ELEVATE code and checked the running services, so every statement about
+ELEVATE is marked as confirmed in code (CODE), seen on a running ELEVATE (RUNTIME;
+shown as OBSERVED in the presentation), an assumption we have adopted, or a check
+scheduled in the first three weeks (SPIKE). These are checks of ELEVATE itself, not a prototype
+of the proposed solution.
+
+Problem statement
+Please read the problem statement first; this proposal answers it. A State Health Quality
+Mission is running a 12-month programme to reduce avoidable hospital-acquired infections
+across 150 public hospitals in 12 districts, with about 2,500 users in seven roles, intermittent
+connectivity, three languages and no patient data, starting with a 12-week pilot in 15
+hospitals. The full statement, with actors, journeys, integrations, constraints and the questions
+to answer, is here: IPC Programme - Problem Statement (also attached as
+IPC_Programme_Problem_Statement.pdf).
+
+The questions this proposal answers
+ Question                          Our answer in one line                                            Section
+
+ Should ELEVATE be used,           Yes, as the operational core, with a thin NavaDhiti-built         1
+ and how?                          layer for access control, task review, escalation, versions
+                                   and audit. No new platform and no other open-source
+                                   product.
+ What does the programme           10 capabilities, 7 actors, 8 journeys. Every open question        2
+ need, and what must               has a recommended answer, confirmed at gate G1 (week
+ ShikshaLokam confirm?             3).
+ Which ELEVATE services            Ten ELEVATE services at named commits; each                       3
+ cover which requirement?          requirement is mapped to its service, APIs and verification
+                                   status.
+ What is reused, configured,       Ten services reused, the field app customised, three small        4
+ extended, built or                parts (four services) built on top, five external systems
+ integrated?                       integrated; and why not another open-source tool.
+ What does the architecture        Apps, a public Edge, a programme layer, ELEVATE core              5
+ look like, and where does AI      services, three ELEVATE AI services at scale-up (and why
+ fit?                              the others are left out), data stores, external systems.
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Question                          Our answer in one line                                          Section
+
+ Who owns each record?             One owning service per record; versions, audit and the no-      6
+                                   patient-data boundary are designed in.
+ How do the three key              Assessment to plan, evidence to validated closure, and          7
+ workflows run?                    expert support to plan follow-up, each drawn step by step.
+ Which APIs and events             Each API and event is listed with its owner, caller, the        8
+ connect the parts, and            journey step that uses it, and how it is authenticated.
+ where is each used?
+ How does it work offline?         Encrypted on-device storage, an ordered outbox, version         9
+                                   checks, conflict refusal and media retry.
+ How are security and              Scoping at the Edge, signed evidence links, audit, secrets,     10
+ operations handled?               monitoring, backup and separate environments.
+ How are repositories,             No backend fork; one field-app customisation; images            11
+ deployments and upgrades          pinned; every upgrade re-runs the verification suite.
+ handled?
+ How is the 12-week pilot          A 13-FTE team led by NavaDhiti, five gated phases,              12
+ delivered?                        validation spikes in weeks 2-3 and a scale-up decision at
+                                   week 12.
+ How do we know the pilot is       Representative test scenarios, the evidence required at         13
+ ready?                            gate G4, and the measures used at gate G5.
+ What are the risks and trade-     Each risk has an owner and a mitigation already in the          14
+ offs?                             plan; alternatives we rejected; what would change our
+                                   recommendation.
+ What did NavaDhiti test to        Facility-scoped access was tested on running ELEVATE            15
+ prove the design?                 services and found unsafe, which is why the Edge exists.
+
+
+
+
+1. Executive recommendation
+Recommendation. NavaDhiti recommends using ELEVATE as the operational core for
+programme structure, facility hierarchy, ward assessments, improvement-plan structure,
+offline field capture, expert mentoring and reporting. It should not be used alone. NavaDhiti
+adds a thin, programme-owned layer for the responsibilities ELEVATE does not cover or does
+not enforce safely: facility- and ward-level access control, task assignment and evidence
+verification, multi-level validation, escalation, checklist version governance and an append-
+only audit ledger (hash-chained at scale-up).
+
+This is a reuse-first design, not a maximum-reuse design. NavaDhiti's validation work (section 15)
+showed that the ELEVATE services must not be exposed directly to end users in this programme. All
+client traffic passes a Programme Edge.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+1.1 The decisions that matter most
+ #     Decision                                          Why (evidence)
+
+ D1    Assessments use samiksha observations             Both are verified at runtime: an assessment
+       with wards as entities; plans use project-        completed and published its event (V5); and
+       service projects and tasks.                       importFromLibrary created an officer-owned plan
+                                                         at runtime, which was then synced and extended
+                                                         (V4, V4b). The creation mechanism is proven with
+                                                         a sample template; applying it to the IPC
+                                                         checklist-derived templates is validation spike S1.
+                                                         The automatic assessment-to-plan path
+                                                         (userProjects/details) is broken in this version (V3
+                                                         T6), so plans are created through
+                                                         importFromLibrary.
+ D2    A Programme Edge is the only public API           RUNTIME: given an evidence object key, a user in
+       entry point (evidence links and sign-in are       another hospital obtained a signed URL for it and
+       the only other internet-facing endpoints). It     read the file (V1, broken object-level
+       derives scope from the server, overwrites         authorization); a user in another organisation
+       client profile fields, checks resource            wrote answers into another facility's assessment
+       ownership and blocks unsafe routes.               submission (V5b); plan targeting ignores the
+                                                         token's organisation (V3); the scheduler answers
+                                                         without a token (V2).
+ D3    A programme-owned IPC Workflow Service            CODE: plan templates have no owner, due-date or
+       owns assignment, evidence review,                 dependency field; user-project tasks accept a free-
+       validation levels, escalations, checklist         text assignee and dates, but nothing enforces or
+       versions and baselines.                           governs them, only four statuses exist and there
+                                                         is no review, approval or escalation workflow
+                                                         (C10, C5).
+ D4    Evidence files are signed and served only         RUNTIME V1: project-service signs read URLs for
+       by a programme Evidence service with              any path and serves a no-token download route.
+       facility checks and object lock.
+ D5    A published checklist is never edited. Each       CODE: no version field on solutions or questions;
+       version is a new samiksha solution,               questions are edited in place (C12, C13).
+       recorded in a version catalogue.
+ D6    Sign-in uses ELEVATE's own user service           The programme tool does not need single sign-
+       (password, or OTP where the tenant                on, and ELEVATE already manages users, roles
+       enables it). No separate single sign-on           and organisations. If the state later requires its
+       product is added.                                 own identity provider, ELEVATE's SSO
+                                                         configuration is used and confirmed in a spike.
+                                                         ELEVATE's optional Keycloak token mode stays off
+                                                         (CODE V6).
+ D7    No backend fork. Fix defects through              Most gaps are compensated at the Edge, so
+       upstream pull requests. The only code             upgrade cost stays low (section 11).
+       change to ELEVATE is a customisation of
+       the field app (GPS, offline outbox, form-
+       version check, languages), kept in step with
+       each release.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+1.2 Main gaps in ELEVATE today (each confirmed in code or at runtime; section
+15)
+     Access control: evidence, submissions and plan targeting are not scoped by facility or
+      ward on the server.
+     Workflow: no task owner, dependency, evidence requirement, approval, multi-level
+      validation or escalation.
+     Offline sync: conflicts between devices sharing a download token are not detected; a stale
+      device overwrites newer data and replays are accepted (V4).
+     Versioning and audit: no checklist versioning; project history stores only user and time.
+     Channels: notification is email only; field apps never capture GPS; question content is
+      single-language.
+     Tokens: all ELEVATE services share one signing secret per environment, so the secret must
+      be protected and rotated.
+
+1.3 Recommended pilot boundary
+    In the pilot (15 hospitals, about 250 users)          Deferred to scale-up
+
+    Baseline and repeat ward assessments (one             Additional checklist families and facility-type
+    checklist family, three languages, offline)           variants
+    Improvement plans, task evidence, supervisor          Configurable multi-step approval chains beyond
+    review, high-risk second validation                   two levels
+    Escalation of overdue critical tasks and repeated     AI SOP companion with voice (Saathi, knowledge
+    rejections (email and in-app notification in the      base, Bhashini)
+    programme web module; SMS at scale-up)
+    Expert-support requests through ELEVATE               AI evidence pre-check, shadow mode first
+    mentoring                                             (evidence analysis)
+    District and state dashboards; governed event         Full data-warehouse integration and public
+    feed to the state platform                            dashboards
+
+
+Scale-up decision at week 12 (gate G5) uses the criteria in section 13.3. The service ownership
+and data boundaries are the same for 15 and 150 hospitals; scale-up adds capacity, content
+and districts, not new owners.
+
+
+2. Requirement interpretation
+2.1 Capabilities
+    Capability               Scope in this programme                                        Journeys
+
+    C1 Programme and         Facility hierarchy (state, district, hospital, ward), ward     Setup
+    reference data           types, cycles, targets, roles
+    C2 Checklist             Versioned ward checklists with scoring, risk rules, three      Setup, repeat
+    management               languages
+    C3 Assessment            Ward assessment offline: scored questions,                     Baseline, repeat
+    capture                  observations, notes, geotagged and time-stamped
+                             media, declaration
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Capability                  Scope in this programme                                        Journeys
+
+ C4 Improvement              Plans from findings: goals, milestones, tasks with             Plan
+ planning                    owner, due date, dependency, evidence and approval
+                             rule
+ C5 Execution and            Status updates, evidence, supervisor                           Execution
+ verification                accept/reject/request, second validation for high-risk
+                             tasks
+ C6 Escalation               Rule-based escalation of overdue critical tasks and            Escalation
+                             repeated rejection; owner and history preserved
+ C7 Expert support           Request, match (expertise, language, availability),            Expert support
+                             session, agreed actions into the plan
+ C8 Comparison and           Baseline vs repeat by ward, facility and checklist             Repeat, oversight
+ oversight                   version; dashboards; data-quality exceptions
+ C9 Identity, access and     ELEVATE sign-in and roles, facility/ward scoping,              All
+ audit                       attributable, append-only audit (hash-chained at scale-
+                             up)
+ C10 Integration and         HR, facility master, SMS, object storage, state analytics;     All
+ operations                  monitoring, backup, releases
+
+
+
+2.2 Journeys
+ Journey             Required behaviour                                                 Where handled
+
+ Programme           Configure hierarchy, ward types, cycles, checklists, risk          entity-management,
+ setup               rules, role assignments, target dates; a checklist version in      user, SUP; versions in
+                     use stays auditable when a new one is published.                   Workflow Service (4,
+                                                                                        6.1)
+ Baseline            Scored, offline ward assessment with observations, notes,          samiksha + Field PWA
+ assessment          geotagged and timestamped media and a declaration.                 (7.1, 9); V5
+ Improvement         Findings generate or inform a plan of goals, milestones            project-service
+ plan                and corrective tasks with owners, due dates,                       structure + Workflow
+                     dependencies, evidence requirements and approval rules.            Service governance
+                                                                                        (7.1, 6)
+ Execution and       Staff update tasks and submit evidence; supervisor                 Workflow Service
+ verification        accepts, rejects or requests new evidence; high-risk               (7.2)
+                     closures need second-level validation.
+ Escalation          Overdue critical actions and repeated rejection escalate by        Workflow Service +
+                     configurable rules without changing the original owner or          scheduler (7.2)
+                     history.
+ Expert support      Request an expert; match by expertise, language and                mentoring +
+                     availability; agreed actions return to the plan and are            Workflow Service
+                     tracked to closure.                                                (7.3); V4b
+ Repeat              Periodic reassessment compared against the correct prior           samiksha
+ assessment          baseline, checklist version, ward and facility.                    submissionNumber +
+                                                                                        Workflow Service
+                                                                                        baseline links (6,
+                                                                                        13.3)
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Journey             Required behaviour                                                 Where handled
+
+ Programme           District and state views of completion, overdue critical           data-pipeline +
+ oversight           actions, repeated failures, trends and data-quality                Metabase; analytics
+                     exceptions; operational systems stay the source of truth.          outbox (8.2)
+
+
+
+2.3 Actors and access scope
+ Actor                        Scope (enforced at the          Main actions
+                              Edge)
+
+ State programme              State                           Configure hierarchy, checklists, risk rules,
+ administrator                                                cycles, roles; state reporting
+ District quality manager     Own district                    Monitor hospitals, assign support, review
+                                                              escalations, approve selected closures
+ Hospital infection-          Own hospital, all wards         Coordinate assessments, create plans, review
+ control officer                                              ward progress, second-level validation
+ Ward supervisor              Assigned wards                  Assign actions, verify evidence, request
+                                                              corrections, escalate blockers
+ Frontline staff member       Own assigned tasks              Update tasks, submit evidence
+ Expert mentor                Facilities with an accepted     Agree follow-up actions
+                              support request
+ External auditor             Assigned facilities, read-      Independent assessments; read immutable
+                              only on plans                   evidence and history
+
+
+
+2.4 Questions for ShikshaLokam and the programme, with our recommended
+answers
+These are the questions we would normally ask before committing delivery. So that nothing
+blocks the start, each one has a recommended answer that NavaDhiti will build on.
+ShikshaLokam and the programme confirm them by gate G1 (week 3). A different answer
+changes only the item in the last column. A1, A3, A5, A11 and A14 must be confirmed before
+build starts; the rest can be corrected later without rework.
+ #       Question                         Our recommended answer                         Changes if different
+
+ A1      Does the programme need          No. Users sign in with ELEVATE's own           User-service
+         single sign-on with a state      login (password or OTP); HR sync keeps         configuration only
+         identity system?                 accounts current. If the state later
+                                          mandates SSO, ELEVATE's SSO
+                                          configuration is used
+ A2      What does the HR system          Nightly API or file: employee ID, status,      HR adapter mapping
+         provide, how often?              designation, facility code. Ward
+                                          assignment is kept by the IPC officer
+ A3      Does the facility master         No. Hospitals come from the master;            Entity load job
+         hold wards?                      wards are a programme register under
+                                          each hospital
+ A4      Which messaging route is         SMS through an approved aggregator             SMS adapter
+         approved?                        with registered templates; consent at
+                                          onboarding
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ #       Question                         Our recommended answer                         Changes if different
+
+ A5      Where must data be               Government-approved cloud or state             Deployment target
+         hosted?                          data centre in India; no data leaves
+                                          India
+ A6      How long must records be         Audit 7 years; evidence media 3 years          Lifecycle rules
+         kept?                            after plan closure; other records 5 years
+                                          after programme end
+ A7      Which languages and who          English plus two state languages;              Content effort
+         translates?                      programme supplies reviewed
+                                          translations
+ A8      Which devices are used?          Android 9+ smartphones with Chrome,            Device test matrix
+                                          camera and GPS; desktop browsers for
+                                          officers
+ A9      How long can a device stay       Up to 7 days; reference data refreshed         Cache policy
+         offline?                         at least weekly
+ A10     What volume is expected at       About 1,800 wards, monthly ward                Capacity plan
+         full scale?                      assessments, about 10 photos (2 MB)
+                                          each: about 36 GB of media per month
+ A11     Who defines high-risk            State IPC committee; defaults: critical        Rule configuration
+         actions and escalation           overdue 48 h to IPC officer, 7 days to         only
+         thresholds?                      district; 2 rejections to the next level
+ A12     Are external audit results       No. Released after district review             Workflow visibility
+         visible to the facility at                                                      rule
+         once?
+ A13     Pilot footprint?                 15 hospitals in 2 districts, about 250         Rollout waves
+                                          named users
+ A14     Can any patient data             No. Declaration on every submission;           Moderation process
+         appear in evidence?              photos must not show patients;
+                                          reviewers reject and delete such media
+ A15     Do facility types need           Pilot: one checklist family with ward-         Content effort at
+         different checklists?            type sections. Sub-district and                scale-up
+                                          community variants are published at
+                                          scale-up from the same template
+ A16     What counts as a data-           Baseline missing 3 weeks after go-live;        Dashboard rules
+         quality exception?               photo GPS outside the facility; capture-       only
+                                          to-upload over 7 days; device clock off
+                                          by over 10 minutes; same photo used in
+                                          two wards
+
+
+
+
+3. ELEVATE capability mapping
+Repositories NavaDhiti inspected (upstream, branch, commit). All are branch heads cloned on
+15 Oct 2026. Runtime checks used the released images project 3.4.0, samiksha 3.4.0_RC1,
+entity-management 3.4, user 3.4.0, scheduler 3.4.0, interface 3.3.2, mentoring 3.4 and a
+notification build of master@3108795 (inspected 22-23 Oct; AI services 6 Nov); where the
+image and the branch head could differ, a behaviour is only marked RUNTIME if it was
+observed on the image and the same code is present at the commit.
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+All upstream URLs are https://github.com/ELEVATE-Project/<repository>.git .
+ Repository                           Branch / release      Commit           Role in design
+
+ user                                 master                fcc30ea          Tenants, organisations, roles,
+                                                                             users, permissions, sessions
+ entity-management                    main                  2f62b0a          State > district > hospital >
+                                                                             ward hierarchy
+ samiksha-service                     main                  d6b199f          Checklists (solutions), ward
+                                                                             observations, scoring, reports
+ project-service                      main                  0207cf0          Plan templates, user projects,
+                                                                             tasks, offline sync
+ mentoring                            master                9ff4e73          Mentor profiles, availability,
+                                                                             session requests
+ scheduler                            master                7ca2dcd          Repeatable and delayed jobs
+                                                                             (BullMQ)
+ notification                         master                3108795          Email delivery (SMTP /
+                                                                             SendGrid)
+ interface-service                    main                  8624ee6          Internal API router behind the
+                                                                             Edge
+ solution-upload-portal-service       Elevate-SUP-2.0.7     f6b3ea2          Spreadsheet validation and
+                                                                             publishing of checklists and
+                                                                             plan templates
+ solution-upload-portal               Elevate-SUP-FE-       84fd24d          Authoring UI for the above
+                                      2.0.4
+ data-pipeline                        main                  785fd01          Kafka to reporting Postgres;
+                                                                             Metabase dashboards
+ observation-survey-projects-         release-3.4.1         9512c02          Field PWA (to be customised)
+ pwa
+ observation-portal / project-        release-3.4.1 /       0b23e6f /        Assessment and plan UI
+ player / questionnaire-player        2.1.0 / 3.0.0         d1c6540 /        libraries
+                                                            e3c24b7
+ admin-org-portal / mentoring-        main / master         b25a999 /        Administration; mentor app
+ mobile-app                                                 d6afd8b
+ utils / sl-backend-automation        master / main         cb45e45 /        Shared libraries and health
+                                                            c47f834          checks; regression suites
+
+
+
+3.1 Requirement to ELEVATE mapping
+Each requirement is mapped to the ELEVATE service and the APIs we call, with where in the
+programme we use them. API paths are shortened (service prefix dropped). Status shows how
+far each mapping is proven: RUNTIME (seen working on a running service), CODE (read in the
+source), SPIKE (checked in weeks 2-3) or Gap (built by the programme layer).
+ Requirement           ELEVATE service and APIs            Where we use it                         Status
+
+ Facility hierarchy,   entity-management:                  Programme setup: facility-              CODE; ward
+ ward types            entityTypes/bulkCreate,             master adapter loads hospitals          load SPIKE
+                       entities/bulkCreate,                nightly; ward register loaded
+                       bulkUpdate, subEntityList           per hospital
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Requirement           ELEVATE service and APIs            Where we use it                         Status
+
+ Roles and role        user: user-role/list,               Programme setup: seed the               RUNTIME
+ assignment            user-role/create,                   seven programme roles and
+                       permissions/list                    their API permissions
+ User provisioning     user:                               HR adapter: nightly joiners and         CODE (admin
+ from HR               org-admin/bulkUserCreate,           leavers; ward service accounts          only)
+                       org-admin/deactivateUser
+ Checklists with       samiksha:                           Programme setup: state team             CODE
+ scoring               solutions/importFromSolution        publishes each checklist
+                       ,                                   version from a spreadsheet
+                       uploadCriteriaRubricExpressi
+                       ons; SUP publishing
+ Checklist versions    Not supported (no version           Version catalogue in the                Gap; copy
+ stay auditable        field; questions edited in          Workflow Service; each version          check SPIKE
+                       place)                              is a new samiksha solution              S2
+ Ward assessment       samiksha:                           Baseline and repeat                     RUNTIME (V5)
+ offline               observations/create,                assessment: officer or auditor
+                       observations/assessment,            downloads the ward form,
+                       observationSubmissions/upd          works offline, submits
+                       ate
+ Geotag and            samiksha stores the                 Assessment and task evidence:           RUNTIME
+ timestamp             gpslocation header and              field app adds GPS and time to          server; Gap:
+                       submit time; the app does not       every photo                             app
+                       capture GPS
+ Declaration           No declaration field                Assessment: mandatory                   Gap
+                                                           programme question, checked
+                                                           at the Edge
+ Plan from             project-service:                    Improvement plan: Workflow              RUNTIME (V4);
+ findings              templates/importProjectTemp         Service creates the ward plan           auto-create
+                       late,                               from the findings after officer         fails (V3)
+                       templateTasks/bulkCreate,           approval
+                       userProjects/importFromLibr
+                       ary
+ Task owners,          Not governed: templates have        Execution: owners and rules             Gap
+ dependencies,         no owner or due date                held in the Workflow Service
+ evidence and
+ approval rules
+ Supervisor            Not supported                       Execution and verification:             Gap
+ verification, two-                                        Workflow Service review states
+ level validation
+ Escalation            scheduler: jobs/create,             Escalation: hourly sweep job            CODE; rules
+                       jobs/list; project-service:         calls the Workflow Service rules        are a gap
+                       reports/entity (overdue count)
+ Expert matching       mentoring: mentors/list,            Expert support: shortlist               CODE;
+ and requests          availability/isAvailable,           mentors, book and accept a              matching
+                       requestSessions/create,             session                                 SPIKE S3
+                       accept, reject
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Requirement           ELEVATE service and APIs            Where we use it                         Status
+
+ Agreed actions to     project-service:                    Expert support: mentor-agreed           RUNTIME
+ plan                  userProjects/sync                   actions added as plan tasks             (V4b)
+ Repeat                samiksha:                           Repeat assessment: compare              CODE; cross-
+ assessment vs         observationSubmissions/creat        with the correct prior baseline         version gap
+ baseline              e (submissionNumber),               and version
+                       reports/fetch
+ Oversight             data-pipeline consumes              Programme oversight: district           RUNTIME
+ dashboards            project and observation             and state dashboards                    events; CODE
+                       events; Metabase                                                            jobs
+ Messaging             notification: email only            Reminders and escalations:              Gap: SMS
+                                                           email and in-app in the pilot;
+                                                           SMS adapter at scale-up
+ Object storage        project-service: cloud-             Not called by apps: the                 RUNTIME;
+                       services/files/preSignedUrls,       Evidence service signs all links        unsafe (V1)
+                       getDownloadableUrl                  instead
+ Audit                 project-service updateHistory       Every decision also written to          RUNTIME;
+                       (user and time only)                the audit ledger                        Gap: ledger
+
+
+
+
+4. Adaptation decision matrix
+Each capability is classified as use as-is, configuration, maintained ELEVATE extension,
+separate custom component or external integration, with the reason and the maintenance
+consequence. Evidence references (V* runtime tests, C* code claims) point to sections 3 and
+15 and to the technical evidence pack shared with this proposal.
+ Capability              Classification      Reason                              Maintenance consequence
+
+ Tenants,                Configuration       user service fits; permissions      Seed roles and permission
+ organisations,                              are role plus API based (C43,       rows kept in a versioned
+ roles, users                                V2)                                 config repo and promoted
+                                                                                 through environments
+ Facility and ward       Configuration +     entity types model state-           Nightly facility-master
+ hierarchy               External            district-hospital-ward; facility    adapter; ward register
+                         integration         codes are authoritative in the      owned and versioned by the
+                                             master (A3, C24/C45)                programme
+ Checklists, scoring     Configuration       samiksha rubric model fits          Checklists kept as SUP
+ and rubrics                                 ward audits; authored and           spreadsheets in git; no code
+                                             published through SUP (C41,         change to add or revise
+                                             S1-S4)                              content
+ Checklist version       Separate            samiksha has no version field       Version catalogue in the
+ governance              custom              and edits questions in place        Workflow Service; the Edge
+                         component           (C12, C13)                          blocks edits to published
+                                                                                 solutions
+ Ward assessment         Use as-is           submission, completion and          None beyond tracking
+ capture (server)                            event publication work on the       ELEVATE upgrades
+                                             stack (V5)
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Capability              Classification      Reason                              Maintenance consequence
+
+ Field assessment        Maintained          no GPS capture, no outbox,          Customisation limited to
+ and plan apps           ELEVATE             no form-version check,              named modules; rebased
+ (offline, GPS,          extension           language hard-coded (C34-           on each ELEVATE frontend
+ languages, version      (field-app          C38)                                release
+ check)                  customisation)
+ Improvement plan        Use as-is           templates, tasks, sync and          The Edge adds idempotency
+ structure and           (behind the         task append work (V4, V4b);         and plan-version checks
+ offline sync            Edge)               sync has no real conflict check     without changing ELEVATE
+                                             (V4)
+ Task assignment,        Separate            templates have no owner or          Owned by the programme
+ evidence review,        custom              due date and the free-text          team; ELEVATE upgrades
+ validation,             component           assignee is not enforced; no        are unaffected
+ escalation                                  dependency, evidence rule,
+                                             approval, review or escalation
+                                             in project-service (C10, C5)
+ Facility and ward       Separate            server does not scope by            Edge rules versioned with
+ scoped access and       custom              facility or check ownership         tests; each finding raised
+ resource ownership      component           (V1, V3, V5b)                       upstream so the rule can
+                         (Programme                                              later be retired
+                         Edge)
+ Evidence storage        Separate            project-service signs any path      All signing and retrieval
+ and retrieval           custom              and exposes a no-token              move to the Evidence
+                         component           download route (V1, C6, C7)         service; ELEVATE file routes
+                         (Evidence                                               blocked at the Edge
+                         service)
+ Assessment to plan      Separate            no automatic assessment-to-         Workflow Service consumes
+ orchestration           custom              plan step; the targeted auto-       the completion event and
+                         component           create path errors (V3)             creates the plan via
+                                                                                 importFromLibrary (V4)
+ Audit and tamper        Separate            project history stores only         Append-only ledger in the
+ evidence                custom              user and time and is rewritten      pilot, hash-chained at scale-
+                         component           on sync (C4, V4)                    up, fed by events and
+                         (audit ledger)                                          decisions; nightly WORM
+                                                                                 export at scale-up
+ Expert mentoring        Use as-is +         profiles, availability, default     Language and expertise
+ and matching            Configuration       rules and request sessions          added as profile attributes
+                                             exist (mentoring APIs; C30,         and rules; confirmed by
+                                             C31, C33)                           spike S3
+ Expert-agreed           Use as-is           project sync appends new            Actions become normal
+ actions into the                            tasks (V4b)                         plan tasks with owners and
+ plan                                                                            evidence rules
+ Escalation              Use as-is           scheduler runs repeatable           Rules live in the Workflow
+ scheduling              (scheduler) +       and delayed jobs (J1-J3); it has    Service; the scheduler
+                         custom rules        no rules engine and no auth         reaches it only inside the
+                                             (V2)                                private network
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Capability              Classification      Reason                              Maintenance consequence
+
+ Sign-in and identity    Use as-is +         ELEVATE's user service              No extra identity product to
+                         Configuration       already gives login (password,      run; HR sync keeps accounts
+                                             or OTP where the tenant             current; if the state later
+                                             enables it), roles and              mandates its identity
+                                             organisations; the                  provider, ELEVATE's own
+                                             programme tool does not             SSO configuration is used
+                                             need single sign-on                 (confirmed in a spike)
+ Notifications (SMS      External            notification sends email only       SMS adapter records
+ and delivery status)    integration +       and drops SMS (C19, C20)            consent and delivery
+                         custom                                                  receipts; email reused as-is
+                         adapter
+ HR and facility-        External            bulk user and entity APIs exist     Adapters run on a schedule
+ master                  integration +       (U4, U5, E3, E4); no connector      and reconcile against the
+ synchronisation         custom              or scheduling                       authoritative sources
+                         adapter
+ Oversight               Use as-is +         data-pipeline consumes              Dashboards configured; a
+ dashboards and          External            project and observation             governed event outbox
+ analytics feed          integration         topics into Metabase (C39,          feeds the state analytics
+                                             C40)                                platform
+ Patient-identifiable    External            out of scope by the data            Never captured, stored or
+ clinical data           (excluded)          boundary (A14)                      emitted; enforced by form
+                                                                                 design, declaration and
+                                                                                 moderation
+
+
+
+4.1 Reuse, modify and build-new summary
+The same decisions, grouped by build effort. Most of the platform is reused; the programme
+builds only the responsibilities ELEVATE does not cover safely, and modifies only the field
+client.
+ Approach               What                                                        Why
+
+ Reuse as-is /          ELEVATE services: user (tenants, orgs, roles), entity-      These work as verified
+ configure              management (facility and ward hierarchy), samiksha          (V4, V4b, V5, mentoring
+                        (checklists, assessments, scoring), project-service         APIs, C39/C40) and are
+                        (plan and task structure, offline sync), mentoring          maintained upstream;
+                        (profiles, availability, request sessions), scheduler,      using them is
+                        notification (email), interface-service, solution-          configuration, not code.
+                        upload-portal, data-pipeline and Metabase.
+                        Configured through seed roles, entity types, SUP-
+                        published checklists and dashboards.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Approach              What                                                         Why
+
+ Modify                The field app only: a customisation of ELEVATE's own         The base app lacks these
+ (maintained           field app (PWA and its player libraries), adding an          (C34-C38). The change
+ ELEVATE               offline outbox, GPS and timestamp capture, a form-           set is limited to named
+ extension)            version check and the two state languages.                   modules and re-applied
+                                                                                    on each release, so
+                                                                                    upgrade cost stays low.
+                                                                                    It is a customisation, not
+                                                                                    a separate product.
+ Build on top (thin    Three parts, deployed as four services: (1)                  ELEVATE does not govern
+ programme layer)      Programme Edge (facility and ward scoping,                   task ownership and has
+                       ownership checks, route allow-list, idempotency)             no review, validation,
+                       with its Evidence service (scope-checked signed              escalation, versioning or
+                       URLs, object lock); (2) IPC Workflow Service (task           facility-scoped access
+                       assignment, evidence review, two-level validation,           (C10, C5, C12/C13; V1, V3,
+                       escalation rules, checklist version catalogue,               V5b), so these are built
+                       assessment-to-plan orchestration) with its audit             outside ELEVATE and
+                       ledger and the officer and supervisor web screens;           keep it upgradable.
+                       (3) integration adapters.
+ External              HR system, facility master, SMS/messaging provider,          Authoritative sources
+ integration           object storage, state analytics platform.                    and consumers outside
+                                                                                    the programme's
+                                                                                    ownership; connected
+                                                                                    through adapters, not
+                                                                                    rebuilt.
+
+
+In short: the operational platform is reused, one client is modified, and the programme-specific
+control plane (access, workflow, evidence, audit) is built as a thin layer on top - the part ELEVATE
+does not provide.
+
+4.2 Why a complete new setup is avoided
+The programme's own rule is to use ELEVATE where it fits. Most of what the programme
+needs already works in ELEVATE, was verified by NavaDhiti, and is maintained upstream;
+rebuilding it would cost months the 12-week pilot does not have and would leave the
+programme maintaining its own copy of a public platform.
+ Needed by the programme                        Already in ELEVATE (evidence)
+
+ Ward checklists, scoring and offline           samiksha: submission, completion and event publication
+ assessment capture                             verified at runtime (V5)
+ Improvement plans and tasks with               project-service: plan created from a template and synced,
+ offline sync                                   tasks appended at runtime (V4, V4b)
+ Checklist authoring without code               solution upload portal (SUP) calls the import and rubric
+                                                APIs (C41)
+ Users, roles, permissions and the state-       user and entity-management services (C43, C45)
+ to-ward hierarchy
+ Expert matching by expertise                   mentoring profiles and default matching rules (C31, C33)
+ Timed jobs and email                           scheduler with retries (C27); notification email (C19)
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Needed by the programme                        Already in ELEVATE (evidence)
+
+ District and state dashboards                  data-pipeline consumes project and observation events
+                                                into Metabase (C39, C40)
+ A tested API surface                           63 ELEVATE APIs probed on a running deployment; 59
+                                                healthy, 4 live with a downstream error (evidence pack)
+
+
+So ten ELEVATE services and the existing data stores are reused without code change, one field app
+is extended, and development is limited to what follows in 4.3.
+
+4.3 Why the governed workflow must be developed
+ELEVATE is reused for what it already does: storing tasks and evidence files, offline sync, timed
+jobs and email. This is not a new platform. But project-service treats a plan as edited by its
+owner or a shared list of users, and five behaviours the programme requires cannot be
+switched on by configuration (project-service at 0207cf0):
+ Programme requires          ELEVATE today (code fact)                                      So it is
+
+ A task is assigned to       Template tasks have no owner or due-date field (C10); a        ELEVATE + NEW
+ frontline staff             free-text assignee is never read by the code. Access is        LAYER
+                             whole-plan: owner or a shared user list, so any listed
+                             user can change any task.
+ A supervisor accepts,       No approve or reject operation exists in project-service;      ELEVATE + NEW
+ rejects or asks for a       only four task statuses are accepted.                          LAYER
+ retake, with a reason
+ A second officer            No multi-level approval or role-based sign-off exists.         ELEVATE + NEW
+ validates high-risk                                                                        LAYER
+ closure
+ An overdue critical         Neither project-service nor the scheduler contains             ELEVATE
+ task escalates without      escalation logic; the scheduler only runs timed jobs           scheduler + NEW
+ changing its owner          (C27) and has no authentication (C26).                         LAYER rules
+ Every decision is           Plan history keeps only userId and time (C4); a stale          ELEVATE + NEW
+ attributable and            offline sync overwrote newer data and a replay was             LAYER (audit
+ auditable                   accepted (V4).                                                 ledger)
+
+
+Developing these five behaviours is therefore mandatory, and it is done once in the IPC Workflow
+Service beside project-service rather than inside it, so ELEVATE stays upgradable; the same model is
+proposed upstream (section 12.7).
+
+4.4 Why not another open-source tool to fill the gaps
+We looked at established open-source products for each gap before deciding to build the thin
+layer. Each would work on its own, but each brings a second runtime, a second user and
+permission model and a second copy of tasks or users beside ELEVATE, which then has to be
+kept in sync. The gaps themselves are small: five behaviours and a scope check. So the pilot
+builds them on top of ELEVATE and keeps the option open where a product would pay off at
+scale.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Gap                   Open-source             Why not for this programme                  Revisit when
+                       option considered
+
+ Task review,          Camunda or              A separate engine with its own task         Approval chains
+ approvals,            Flowable (BPMN          list and users; plans and tasks would       grow beyond two
+ escalation            engines); Temporal      live in two places (engine and              levels or across
+                       (durable                project-service) and need syncing;          many programmes
+                       workflows)              BPMN skills and a Java or cluster
+                                               runtime for five state changes
+ Sign-in and single    Keycloak                ELEVATE's user service already              A state mandates
+ sign-on                                       provides login (password or OTP),           an identity
+                                               roles and organisations; the tool           provider that
+                                               does not need single sign-on, and           ELEVATE's SSO
+                                               SSO, if mandated, is ELEVATE                settings cannot
+                                               configuration                               connect
+ Facility and ward     Open Policy Agent       The pilot has one rule family (facility     Rules multiply
+ access rules          (policy engine)         and ward scope by role), kept as            across states and
+                                               tested code in the Edge                     programmes
+ Tamper-evident        immudb, Trillian        An append-only PostgreSQL table             An external auditor
+ audit                                         meets the pilot need; hash-chaining         asks for
+                                               and a write-once export are added at        cryptographic
+                                               scale-up                                    proofs
+ Reminders and         Low-code                Not governance-grade (no audited            Never for core
+ messaging             automation (n8n,        rule versions); ELEVATE scheduler           rules; possibly for
+                       Node-RED)               and notification already run timed          internal ops alerts
+                                               jobs and email
+
+
+
+
+5. Logical architecture
+Read the diagram from top to bottom. Every app talks only to the public Edge. The Edge
+checks who the user is and which facility and ward they may touch, then calls either the
+programme layer that NavaDhiti builds or an allow-listed ELEVATE service. ELEVATE's AI
+services sit beside the core services and are switched on only at scale-up. External systems
+connect only through the adapters.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Figure 1. Logical architecture: apps, public Edge, programme layer, ELEVATE core and AI services, data stores and
+                                   external systems, inside three trust boundaries.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+5.1 Components and responsibilities
+ Component               Type           Responsibility
+
+ Programme Edge          DESIGN         Single public API. Checks the ELEVATE login token, derives facility
+ API                                    and ward scope from server data, replaces client-supplied profile
+                                        fields, records resource ownership (submissionId, projectId) and
+                                        refuses writes by anyone else, enforces Idempotency-Key, allow-
+                                        lists ELEVATE routes, rate-limits.
+ Evidence service        DESIGN         Issues upload intents and short-lived signed URLs after a
+                                        facility/ward check; stores evidence metadata (hash, GPS, time,
+                                        uploader, task or question link); bucket with object lock and
+                                        lifecycle rules.
+ IPC Workflow            DESIGN         System of record for assignments, verification states, validation
+ Service                                levels, escalations, checklist version catalogue and baseline links.
+                                        Consumes ELEVATE events; calls ELEVATE internal APIs.
+ Audit ledger (part      DESIGN         Append-only record of every programme event and
+ of the Workflow                        administrative change (pilot); hash-chaining and nightly WORM
+ Service)                               export at scale-up.
+ Officer and             DESIGN         New screens for the review queue, plan board and validations;
+ supervisor web                         part of the programme layer, calls only the Edge. Not a change
+                                        to ELEVATE.
+ Integration             DESIGN         HR and facility-master sync into user and entity-management;
+ adapters                               SMS gateway with consent and delivery receipts; analytics
+                                        outbox.
+ ELEVATE services        Reused         user, entity-management, samiksha, project, mentoring,
+                                        scheduler, notification, interface-service, SUP, data-pipeline
+                                        (section 3).
+ ELEVATE AI              Reused at      Three, used at scale-up: AI-Service gateway, evidence analysis,
+ services                scale-up       Saathi with its knowledge base (voice through Bhashini, a
+                                        government service). Mitra later; WhatsApp bot not needed.
+                                        Called only through the gateway and the Edge; never write a
+                                        core record directly (section 5.3).
+
+
+
+5.2 Trust boundaries
+ Boundary                Controls
+
+ TB1 Public edge         TLS 1.2+, WAF, rate limits; only the Edge and the Evidence service are reachable
+                         from the internet; sign-in goes through the Edge to ELEVATE's user service.
+ TB2 Private             ELEVATE and programme services have no public ingress; network policies
+ network                 allow Edge-to-service and service-to-service paths only; per-environment
+                         internal-access-token and signing secrets kept in the platform's encrypted
+                         secret store.
+ TB3 External            Mutual TLS or signed requests to HR, facility master, SMS provider and state
+ systems                 platform; inbound callbacks (SMS delivery receipts) verified by signature and
+                         allow-listed source.
+ Data boundary           No patient-identifiable data in any store, event or file (A14). Enforced by form
+                         design, declaration, reviewer moderation and a retention rule; patient
+                         identifiers are not a field anywhere in the data model.
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+5.3 AI enablement for scale
+The pilot runs without AI. Scale-up to 150 hospitals needs it, because the hospital infection-
+control officer reviews every evidence item and that load grows with every ward. The ELEVATE
+ecosystem already has AI services; the ones we use are the orange row of Figure 1.
+NavaDhiti's job is to harden and connect them, not to build new ones.
+
+ELEVATE is a set of microservices. The core services keep the programme records; capability
+services such as AI plug in beside them through APIs and events. Each AI service is called only
+through the AI-Service gateway and the Edge, never writes to a core record, and can be
+switched on per state. Today evidence analysis calls its model provider directly, so this wiring
+is integration work, not existing behaviour. The same boundaries let the services be mixed
+and matched for another programme or plugged into a state's own platform, and AI output
+never becomes a second source of truth.
+
+We use an AI service only where it removes real work in this programme, and say why the
+others are left out. Only the three services marked USE appear in the architecture (Figure 1).
+ ELEVATE AI            Decision         Why                                         Before use
+ service
+
+ AI-Service            USE (scale-      Every AI call goes through one door:        Switch on redaction with
+ gateway               up)              model allow-list, monthly budget per        Aadhaar, UHID and bed-
+                                        state, patient-data redaction and a         number rules; enforce
+                                        call log                                    rate limits
+ Evidence analysis     USE (scale-      The biggest saving: today the officer       IPC criteria and prompt;
+                       up, shadow       reviews every photo. A pre-check            route via the gateway;
+                       first)           flags weak evidence so reviewers            image screen for
+                                        check flagged items plus a random           patients; agreement with
+                                        sample                                      officers
+ Saathi with its       USE (scale-      Ward staff ask SOP questions by             Fix token verification;
+ knowledge base        up)              voice in their own language and hear        multilingual search; load
+ (voice through                         the hospital's own answer, with             hospital, NCDC and WHO
+ Bhashini, a                            sources; cuts calls to the officer          IPC SOPs
+ government
+ service)
+ Mitra co-pilot        LATER            Drafting tasks from findings helps,         Revisit after scale-up
+                                        but pilot plans come from approved          wave 1
+                                        IPC templates, so the gain is small
+                                        until checklist families multiply
+ WhatsApp bot          NOT NEEDED       The field app already lists tasks           Revisit only if app
+                                        offline and takes evidence; reminders       adoption is low
+                                        go by in-app message and SMS. A
+                                        second channel would need its own
+                                        security fixes and consent handling
+ Competency            CONFIGURE        An IPC skills list in mentoring (hand       Load the list in the pilot
+ model                 (no AI)          hygiene, PPE, waste, cleaning, device
+ (mentoring)                            bundles, sterilisation) drives expert
+                                        matching
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+NavaDhiti ran the key gaps on a running copy: the gateway's budget and model allow-list blocked
+calls as designed, but its rate limit did not; Saathi accepted forged, expired and unsigned tokens;
+the WhatsApp bot's routes answered with no credentials (one more reason it is left out). These are
+fixed before any hospital data reaches an AI service.
+
+Guardrails, cost and phasing
+      Human in the loop. AI never closes or rejects a task; it only marks items as pre-checked,
+       and a random sample of passed items is always reviewed.
+      Patient data and residency. Redaction and an image screen run before any model call;
+       providers are India-hosted or Bhashini; every AI decision is stored with its model and
+       prompt version in the audit ledger.
+      Cost. Buttons and scripted flows handle routine traffic; the LLM is called only for free text,
+       inside a monthly budget per state. Speech and translation use Bhashini (Digital Public
+       Infrastructure), which keeps cost low.
+      Phasing. Pilot: no AI on hospital data; officer verdicts on evidence are saved as a labelled
+       IPC test set. Gate G5 decides whether evidence pre-check starts in shadow mode in the
+       first scale-up wave; triage is switched on only when agreement with officers reaches the
+       bar agreed with the programme (we propose 90%).
+      Shared benefit. Hardening fixes go upstream as pull requests, so every ELEVATE
+       programme gains from them.
+
+
+6. Domain and data ownership
+    Entity                 Authoritative owner                  Key fields / notes
+
+    Facility (hospital)    Facility master (external); copy     externalId = facility code (unique per
+                           in entity-management                 tenant, C24), district, status
+    Ward                   Programme ward register in           Child of hospital; ward type; active flag
+                           entity-management
+    User, organisation,    HR system (employment                HR employee ID kept as external reference
+    role                   status); ELEVATE user service
+                           (login, roles, org membership)
+    Scope assignment       IPC Workflow Service                 user to facility/ward with role and validity
+                                                                dates; fed to the Edge
+    Checklist version      IPC Workflow Service                 checklistId, version, samiksha solutionId,
+                           (catalogue) + samiksha               published date, content hash, status
+                           (solution)
+    Assessment (ward       samiksha-service                     observationId, entityId (ward),
+    observation                                                 submissionNumber, answers, scores,
+    submission)                                                 status, completedDate
+    Assessment context     IPC Workflow Service                 submissionId to checklistVersionId, cycle,
+                                                                baseline submissionId, declaration,
+                                                                assessor type (internal or external)
+    Improvement plan       project-service                      projectId, tasks, start/end dates, status
+    and task structure                                          (owner = the ward's programme service
+                                                                account; ownership follows the caller, V4)
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+    Entity                 Authoritative owner                  Key fields / notes
+
+    Task governance        IPC Workflow Service                 owner, dependency, evidence rule,
+                                                                approval rule, risk level, verification state,
+                                                                escalation records
+    Evidence item          Evidence service                     evidenceId, object key, SHA-256, size, MIME
+                                                                type, GPS, captured-at, uploaded-by, link to
+                                                                task or question
+    Support request        IPC Workflow Service                 facility, ward, problem, language, matched
+                                                                mentor, mentoring request id, agreed
+                                                                action ids
+    Mentor session         mentoring                            requestor, requestee, status: ACCEPTED,
+    request                                                     REJECTED, PENDING, REQUESTED,
+                                                                BLOCKED, EXPIRED
+                                                                (CONNECTIONS_STATUS, C30)
+    Notification and       SMS adapter                          consent record, template id, message id,
+    consent                                                     delivery receipt status
+    Audit record           Audit ledger                         event id, actor, action, subject, before/after
+                                                                hash, previous record hash (scale-up), time
+    Reporting tables       data-pipeline (derived, not          Rebuilt from events; operational services
+                           authoritative)                       remain the sources of truth
+
+
+
+6.1 Versioning
+     Checklists: a published samiksha solution is frozen. A new version is a new solution
+      created from the previous one; the catalogue stores version number, solutionId and a
+      hash of the question set. The Edge refuses edit calls on published solutions. Old
+      submissions remain bound to their own solution, so they still render with their original
+      questions.
+     Plan templates: project-service copies template and tasks into each project at creation
+      (CODE), so later template changes never alter running plans; the catalogue records which
+      template version each plan used.
+     Reference data: the hierarchy and scope assignments carry an effective-from date and a
+      version number sent to devices.
+
+6.2 Audit history
+ELEVATE's own history is not sufficient: project updateHistory stores only user and time and is
+rewritten on each sync (RUNTIME V4). Every programme decision (assignment, evidence
+decision, validation, escalation, version publish, admin change) is written by the Workflow
+Service to the audit ledger with before and after hashes. ELEVATE project and observation
+events are also appended, so a plan's state can be reconstructed from the ledger.
+
+6.3 Evidence metadata and the patient-data boundary
+Evidence metadata holds facility, ward, task or question, uploader, captured-at time, GPS,
+device time skew, content hash and review state. No patient name, number, bed label or
+clinical field exists in any schema. Free text is limited in length. The boundary is defence-in-
+depth, not moderation alone: at capture the app constrains evidence to the audit subject (for
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+example wall-, station- or register-level photos) with on-screen guidance and a per-submission
+no-patient-data declaration; the Evidence service can run server-side image checks (for
+example face detection) and hold any positive for review before it is accepted; and a reviewer
+can still reject and permanently delete media that shows a patient, with the deletion audited
+without keeping the content. Structurally there is no patient field to populate, so the residual
+risk is confined to free text and imagery, which these controls target.
+
+
+7. Workflow design
+7.1 Baseline assessment to improvement plan
+
+
+
+
+                               Figure 2. Baseline assessment to improvement plan.
+
+Steps 1, 8 and 9 are verified at runtime (V5: completion event received on
+elevate_observations_dev with entityId, submissionNumber, createdBy, tenantId and orgId).
+Step 14 was run in V4. The plan is created by the Workflow Service under the ward's
+programme service account (its own ELEVATE identity), because project ownership follows the
+caller (V4); the officer approves the draft in the web module, and the Workflow Service stores
+the governance fields.
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+7.2 Task evidence to validated closure
+
+
+
+
+                           Figure 3. Task evidence to validated closure, with escalation.
+
+ Task state (Workflow         Entered when                             Who may move it on
+ Service)
+
+ ASSIGNED                     Plan accepted with an owner              Owner (start), supervisor (reassign
+                                                                       with reason)
+ IN_PROGRESS                  Owner starts work                        Owner
+ EVIDENCE_SUBMITTED           Evidence meets the task's                Ward supervisor
+                              evidence rule
+ CHANGES_REQUESTED            Supervisor requests new                  Owner
+                              evidence
+ VERIFIED                     Supervisor accepts                       Closes, or goes to second validation if
+                                                                       high-risk
+ PENDING_VALIDATION           High-risk task verified                  IPC officer or district quality manager
+ CLOSED                       Accepted (normal) or validated           None (re-open creates a linked new
+                              (high-risk)                              task)
+
+
+Escalation never changes the owner. It adds an escalation record (rule, level, target, time) and
+a notification. Rules are data: condition (overdue critical, rejections >= n), delay, target role,
+channel.
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+Ownership: one writer per field, under the service's own identity. Each plan in project-service
+is owned by a programme service account for its ward, an ELEVATE user used only by the IPC
+Workflow Service; no person's session is borrowed. It is per ward, not per facility, because
+project-service allows one plan per user per solution; each assessment cycle uses its own
+solution for the same reason. The accounts are created by a provisioning job through the org-
+admin bulk user upload (bulkUserCreate). Its controller role check is disabled in code; the
+seeded permissions still limit org-admin routes to ORG_ADMIN (C43), and the Edge also blocks
+the route for everyone except the provisioning job. The split is fixed by field. project-service
+holds the plan structure (goals, tasks, template links) and the display status, and only the
+Workflow Service writes them, through userProjects/sync under the service account. The
+Workflow Service owns everything about governance: task owner, due date, dependencies,
+evidence rule, review state, validations and escalations. Staff, supervisors and officers act
+through the Edge in their own identities, and the Edge refuses any direct client sync to
+project-service. If the two ever diverge, a reconciliation job re-applies the Workflow Service
+state (it writes in one direction only, so it cannot loop) and logs the correction to the audit
+ledger. Spike S1 confirms the per-ward service-account pattern with the IPC templates; if it
+fails, plans fall back to the createProgramAndSolution path, which creates a solution per plan.
+
+Attribution and oversight. project-service history records the service account as the actor,
+which is honest: it is a system projection, not a person. Who did what lives in the Workflow
+Service and the audit ledger, where every action carries the acting user, and reaches
+dashboards through the ipc.* events (section 8.2). data-pipeline's project and observation
+topics still drive plan structure, completion and score dashboards. Every ELEVATE consumer
+therefore sees a consistent, clearly machine-attributed plan, and person-level attribution
+comes from one place.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+7.3 Expert support to plan follow-up
+
+
+
+
+                                    Figure 4. Expert support to plan follow-up.
+
+Task append through sync was run in V4b (step 10). Mentor matching on expertise and
+language uses mentoring profile attributes and default rules (CODE); it is proven with
+programme data in spike S3 before build.
+
+
+8. API and event contracts
+8.1 Synchronous APIs
+The ELEVATE APIs below were checked on a running deployment by NavaDhiti. Programme
+APIs are new (DESIGN) and versioned under /ipc/v1. The 'Where we use it' column names the
+journey step that calls each API.
+ API                             Owner         Called by        Where we use it                Auth
+
+ POST                            samiksha      Field app via    Baseline and repeat            User token;
+ /survey/v1/observations/as                    Edge             assessment: download           Edge ward-
+ sessment/:id                                                   the ward checklist before      scope check
+                                                                going offline
+ POST                            samiksha      Field app via    Baseline and repeat            User token;
+ /survey/v1/observationSub                     Edge             assessment: submit             Edge
+ missions/update/:id                                            answers, photos and            ownership
+                                                                declaration                    check
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ API                             Owner         Called by        Where we use it                Auth
+
+ POST                            project       Workflow         Improvement plan:              Ward service
+ /project/v1/userProjects/i                    Service          create the ward plan after     account;
+ mportFromLibrary/:templa                                       the officer approves the       private network
+ teId                                                           draft
+ POST                            project       Workflow         Execution and expert           Ward service
+ /project/v1/userProjects/sy                   Service          support: mark validated        account; clients
+ nc/:id                                                         tasks complete; add            never call it
+                                                                mentor-agreed tasks
+ POST                            project       Workflow         Programme setup:               internal-access-
+ /project/v1/project/templa                    Service          publish plan templates         token
+ tes/importProjectTemplate                                      linked to each checklist
+ ,
+ templateTasks/bulkCreate
+ GET                             mentorin      Workflow         Expert support: shortlist      Service-account
+ /mentoring/v1/mentors/lis       g             Service          mentors by expertise,          token
+ t, availability/isAvailable                                    language and availability
+ POST                            mentorin      Officer,         Expert support: request a      User token
+ /mentoring/v1/requestSes        g             mentor via       session; mentor accepts
+ sions/create, accept, reject                  Edge             or declines
+ POST                            scheduler     Workflow         Escalation: register the       Private network
+ /scheduler/jobs/create                        Service          hourly sweep of overdue        only (no auth,
+                                                                critical tasks                 V2)
+ POST /user/v1/org-              user          HR adapter       Programme setup and            Org-admin
+ admin/bulkUserCreate,                                          daily: joiners, leavers,       service account
+ deactivateUser                                                 ward service accounts
+ POST /entity-                   entity-       Facility         Programme setup and            Admin +
+ management/v1/entities/b        mgmt          adapter          nightly: hospitals from        internal token
+ ulkCreate, bulkUpdate                                          the facility master; ward
+                                                                register
+ POST                            Evidence      Apps             Assessment and task            User token;
+ /ipc/v1/evidence/intents;       service                        evidence: upload photos;       facility and
+ GET                                                            reviewers and auditors         ward check
+ /ipc/v1/evidence/{id}/url                                      open them
+ POST                            Workflow      Apps via         Execution and                  User token;
+ /ipc/v1/tasks/{id}/evidence,    Service       Edge             verification: submit           role and scope
+ /decisions, /validations                                       evidence; accept, reject,
+                                                                validate
+ POST /ipc/v1/support-           Workflow      Officer,         Expert support: raise a        User token
+ requests, /{id}/outcome         Service       mentor via       request; record agreed
+                                               Edge             actions
+ POST                            Workflow      scheduler        Escalation: apply the rules    Private network
+ /ipc/internal/escalations/s     Service                        to overdue and                 + signed
+ weep                                                           repeatedly rejected tasks      header
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+8.2 Asynchronous events
+    Topic                     Producer    Consumers            Where we use it         Payload (key fields)
+
+    elevate_observations      samiksha    Workflow             Assessment              submission _id, status,
+    _<env> (RUNTIME V5)                   Service, data-       completed: start        entityId,
+                                          pipeline, audit      the draft plan;         submissionNumber,
+                                                               update                  createdBy, solutionId,
+                                                               dashboards              tenantId, orgId
+    sl-improvement-           project     Workflow             Plan changed:           full project document
+    project-submission-                   Service, data-       reconcile with          on every sync
+    <env> (RUNTIME)                       pipeline, audit      workflow state;
+                                                               dashboards
+    ipc.plan.created /        Workflow    audit, analytics     Plan approved and       projectId, taskId,
+    ipc.task.assigned         Service     outbox               tasks assigned          owner, due date,
+                                                                                       dependencies, rule ids
+    ipc.task.evidence_sub     Workflow    audit, SMS           Evidence review         taskId, actor, decision,
+    mitted / decided /        Service     adapter,             and validation          reason, evidence
+    validated                             analytics            decisions               hashes
+    ipc.task.escalated        Workflow    audit, SMS           Escalation raised;      taskId, rule, level,
+                              Service     adapter              notify the next         target, owner
+                                                               level                   (unchanged)
+    ipc.checklist.publishe    Workflow    audit, Edge          New checklist           checklistId, version,
+    d                         Service     (block edits)        version published       solutionId, content
+                                                                                       hash
+    ipc.notification.delive   SMS         audit                Message delivery        messageId, template,
+    ry                        adapter                          receipt recorded        status, provider time
+
+
+
+8.3 Authentication, idempotency, errors and retries
+     Authentication: users sign in with ELEVATE's own login (password, or OTP where the
+      tenant enables it) through the Edge, which passes the call to the user service and keeps
+      the ELEVATE token server-side. On every call the Edge checks the token and looks up the
+      user's facility and ward scope. No separate single sign-on product is added; if the state
+      later mandates its identity provider, ELEVATE's own SSO configuration is used (confirmed
+      in spike S4). Services use per-environment service accounts; internal-access-token never
+      leaves the private network.
+     Idempotency: every client write carries an Idempotency-Key (UUID created when the
+      record enters the outbox). The Edge stores key, user and response hash for 7 days and
+      returns the stored response on replay. This closes the replay gap seen in V4.
+     Conflict detection: the Edge stores a per-project version (hash of the last accepted task
+      set). A sync built on an older version is refused with 409 and the client re-downloads and
+      merges. ELEVATE's own token check is not relied on (V4).
+     Event handling: consumers are idempotent on (topic, key, status); failures go to a dead-
+      letter topic with alerting; schemas are versioned and validated before publish.
+     Errors and retries: clients retry 5xx and timeouts with exponential backoff and jitter (max
+      6 attempts, then manual retry); 4xx is not retried and is shown to the user. Calls between
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+    services have timeouts (ELEVATE hangs on unknown methods instead of returning 404, V2
+    A10).
+
+
+9. Offline approach
+Starting point (CODE, C34-C38): the PWA and players store forms and projects in IndexedDB;
+sync is started by the user; project-player retries an upload three times then marks it failed;
+questionnaire-player does not retry; no GPS is captured; the service worker caches only app
+files; there is no check that a downloaded form is still current. The customised field app adds
+the items below.
+ Concern                   Design
+
+ What is stored on the     Assigned wards and tasks, current checklist versions with their hash,
+ device                    assessment drafts, task updates, evidence files and an outbox. Stored in
+                           IndexedDB, encrypted with a key derived at login; cleared on logout or after
+                           7 days without a successful sign-in.
+ Reference data and        Each download carries the reference-data version and checklist version. On
+ form versions             reconnect the app asks the Edge for current versions. A draft on a retired
+                           version may still be submitted within a grace period and keeps its own
+                           version; after the grace period the user is asked to restart on the new
+                           version.
+ Duplicates                Each record gets a client ID and Idempotency-Key when it enters the outbox.
+                           The Edge returns the stored result for a repeated key, so retries never create
+                           a second submission or task update.
+ Conflicting updates       Task updates carry the plan version they were built on. The Edge refuses
+                           stale writes (409); the app downloads the current plan, shows the differences
+                           and lets the user re-apply. Evidence decisions are server-side only, so they
+                           cannot conflict offline.
+ Media upload              Files are captured with GPS and time, hashed and queued. Upload intents
+ recovery                  are requested per file; uploads retry with backoff; an expired signed URL is
+                           simply re-requested. The submission is sent only after all its files are
+                           confirmed, so the server never holds a submission pointing at missing
+                           media.
+ Order of sending          Outbox is ordered: evidence files, then assessment or task records, then
+                           decisions. A failure stops only the dependent items.
+ Visibility for users      Each item shows pending, sent or needs attention; supervisors see devices
+                           with items older than 72 hours.
+
+
+
+9.1 Offline acceptance tests
+Covered in section 13: 7 days offline with 3 assessments and 20 photos; airplane mode during
+upload; two devices editing the same task; checklist version change while a draft is open; app
+killed mid-sync; low storage.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+10. Security and operations
+10.1 Security controls
+ Area                    Control                                                         Linked evidence
+
+ Organisation and        Scope assignments in the Workflow Service; the Edge             V3 (targeting from
+ ward scoping            filters every read and write by facility and ward and           body), V5b (cross-
+                         replaces client profile fields with server values before        org write)
+                         calling ELEVATE.
+ Resource                Edge keeps a map of submissionId and projectId to               V5b, C16
+ ownership               owner and facility, captured from ELEVATE responses;
+                         writes by others are refused.
+ Roles                   ELEVATE role permissions for ELEVATE APIs; programme            V2 A7, C43
+                         roles (supervisor, validator, auditor) enforced in the
+                         Workflow Service.
+ Evidence access         Only the Evidence service signs URLs (5 min TTL) after a        V1, C6, C7
+                         scope check; ELEVATE file routes are blocked at the
+                         Edge.
+ Identity                ELEVATE login (password or OTP); OTP required for               V6, shared secret
+                         admin roles; ELEVATE's Keycloak token mode stays off;           check
+                         separate signing secrets per environment, rotated
+                         quarterly.
+ Unauthenticated         Scheduler and entity guest routes reachable only inside         V2 A1, A2b
+ ELEVATE endpoints       TB2.
+ Consent                 SMS consent recorded at onboarding with time, channel           A4
+                         and text version; opt-out honoured within 24 h.
+ Audit                   Append-only audit ledger in the pilot; hash-chaining,           section 6.2
+                         daily chain verification and WORM export at scale-up.
+ Secrets                 Platform secret store, encrypted; no secret in images or        -
+                         repositories; per-environment internal-access-token.
+ Retention               Lifecycle rules per assumption A6; deletion jobs logged         A6
+                         in the audit ledger.
+ Patching                Monthly base-image and dependency updates; critical             jsonwebtoken 8.5.1
+                         CVEs within 7 days; dependency scanning in CI.                  in all services
+
+
+
+10.2 Operations
+ Area                  Approach
+
+ Logging               Structured JSON logs with correlation ID from the Edge through all services;
+                       personal data masked; central store (Loki or equivalent).
+ Metrics               Health endpoints (utils/health-check) for every service; Kafka consumer lag;
+                       outbox age reported by devices; API latency and error rates at the Edge.
+ Alerting              Paging for Edge 5xx rate, consumer lag above 10 minutes, failed backups, audit
+                       write failures (chain break from scale-up), certificate expiry.
+ Backup                MongoDB and PostgreSQL: nightly full and continuous log backup; object
+                       storage versioning; Kafka not treated as a store of record.
+ Recovery targets      RPO 15 minutes, RTO 4 hours (pilot); restore drill before UAT (B26) and every
+                       quarter.
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Area                  Approach
+
+ Environments          dev, test, UAT, production with separate tenants, secrets, buckets and Kafka
+                       topic suffixes. Programme configuration (checklists, rules, roles) promoted from
+                       git through the pipeline, never edited directly in production.
+ Releases              Images pinned by digest; blue-green for the Edge and Workflow Service;
+                       database migrations reviewed; release notes linked to gate evidence.
+
+
+
+
+11. Repository and deployment strategy
+11.1 Repositories
+ Repository                               Kind                         Notes
+
+ ELEVATE backend repos (user,             Upstream, consumed           No fork for the pilot. Findings raised
+ entity-management, samiksha-             as released images           as upstream issues and pull
+ service, project-service, mentoring,                                  requests.
+ scheduler, notification, interface-
+ service, SUP service, data-pipeline)
+ ipc-field-pwa                            Customisation of             Changes limited to outbox, GPS
+                                          observation-survey-          capture, version check, languages
+                                          projects-pwa (with           and Edge endpoints; rebased each
+                                          project-player and           release.
+                                          questionnaire-player)
+ ipc-edge                                 New                          Programme Edge API and route
+                                                                       policy, with policy tests per validation
+                                                                       scenario.
+ ipc-evidence                             New                          Evidence service.
+ ipc-workflow                             New                          IPC Workflow Service and audit
+                                                                       ledger.
+ ipc-adapters                             New                          HR, facility master, SMS, analytics
+                                                                       outbox.
+ ipc-config                               New                          Checklists (SUP spreadsheets), risk
+                                                                       and escalation rules, roles and
+                                                                       permissions, translations,
+                                                                       environment values.
+ ipc-deploy                               New                          Helm charts or compose files,
+                                                                       environment overlays, pinned image
+                                                                       digests, runbooks.
+
+
+
+11.2 Deployment units and runtime dependencies
+Each ELEVATE service and each programme service is its own container. Runtime
+dependencies: MongoDB (samiksha, project, entity-management), PostgreSQL/Citus (user,
+mentoring, programme services), Redis (sessions, BullMQ), Kafka with ZooKeeper or KRaft, S3-
+compatible storage and Gotenberg (project PDFs). Kubernetes is the target; the pilot can run
+on the same charts with smaller replicas.
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+11.3 Reconciling future ELEVATE upgrades
+        Pin each ELEVATE image by digest and record it in ipc-deploy; upgrade on a schedule, not
+         ad hoc.
+        Before an upgrade, re-run the API register, the code-claim register and validations V1 to
+         V6. A change in a verified behaviour blocks the upgrade until the Edge rule or adapter is
+         updated.
+        Run sl-backend-automation and the programme regression suite in test.
+        When upstream fixes a finding (for example ownership checks), remove the matching
+         Edge rule only after the validation proves the fix.
+        The field-app customisation is re-applied on each upstream release tag; its change set is
+         reviewed so that it stays small.
+
+
+12. Delivery plan (12-week pilot)
+Full plan with Gantt: IPC_ELEVATE_12_week_pilot_plan.xlsx (generated from the same data as
+this section).
+
+12.1 Team
+    Code      Role                        FTE   Responsibility
+
+    LA        Lead architect              1     Design authority; spikes; ELEVATE upgrade policy; gate
+                                                owner
+    PM        Delivery manager            1     Plan; RAID log; stakeholder cadence; gate evidence packs
+    BA        Business analyst and IPC    2     Checklists; risk rules; translations; UAT scripts
+              subject expert
+    BE        Backend engineer            3     Programme Edge; Evidence service; IPC Workflow Service;
+                                                adapters
+    FE        Frontend engineer           2     Field app customisation; officer and supervisor web
+                                                module
+    DO        DevOps engineer             1     Environments; CI/CD; observability; backup and restore;
+                                                patching
+    QA        QA engineer                 2     Test strategy; automation; performance; UAT support
+    DA        Data engineer (part-time)   0.5   data-pipeline jobs; Metabase dashboards; analytics outbox
+    SEC       Security reviewer (part-    0.5   Threat model; penetration test; security sign-off at gates
+              time)
+
+
+Owner codes above are used in sections 12-14 and in the plan workbook.
+
+Leadership: NavaDhiti's three-member core leads the 13-FTE team. Its ELEVATE solution and
+implementation lead is the lead architect (LA), its backend and integration engineer leads the
+backend group (BE), and its deployment and quality engineer leads DevOps and QA (DO, QA).
+The other ten FTE are programme-funded specialists.
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+12.2 Validation spikes (weeks 2-3)
+ Spik    Question                                                                                  Exit
+ e
+
+ S1      Does importFromLibrary-based plan creation work with the IPC templates                    DR-01
+         under a per-ward programme service account, given one plan per user per
+         solution?
+ S2      Does importFromSolution copy a checklist so old submissions keep their                    DR-02
+         questions?
+ S3      Can mentoring match on expertise and language attributes; resolve the                     DR-03
+         mentors/list 500 seen in testing?
+ S4      Confirm ELEVATE login with OTP for the pilot tenant, and how ELEVATE's SSO                DR-04
+         configuration would connect a state identity provider if one is mandated later.
+
+
+
+12.3 Backlog, sequence and gates
+The full backlog (32 work items and 5 gates; IDs are stable references, not contiguous; with
+owners, dependencies and exit evidence) is in the plan workbook
+(IPC_ELEVATE_12_week_pilot_plan.xlsx), which is shared with this proposal; B-numbers in this
+document refer to it. It runs in five gated phases: mobilise and spikes (weeks 1-3), core build
+(weeks 4-8), hardening and test (weeks 8-10), UAT and wave 1 (week 11), wave 2 and the scale-
+up decision (week 12).
+
+12.4 Milestones and acceptance gates
+ Wee     Milestone                                                     Acceptance gate (exit criteria)
+ k
+
+ 3       Architecture validated: environments built; hierarchy         G1 - no blocking risk open
+         loaded; spikes S1-S4 closed with decision records
+ 6       Edge core, Workflow core and the PWA offline base in          (interim milestone; checked into G2)
+         system test; checklist v1 published
+ 8       Feature complete: all pilot P1 journeys working end to        G2 - no open critical defects
+         end
+ 10      System, offline, performance and security testing             G3 - signed test summary, security
+         passed; external pen test closed; ops ready                   sign-off, operations readiness
+ 11      UAT in 3 hospitals passed; training and translations          G4 - go-live approval
+         done; rollout wave 1 (8 hospitals) live
+ 12      Rollout wave 2 (7 hospitals) live under hypercare; pilot      G5 - scale-up decision
+         measured against 13.3
+
+
+
+12.5 Capacity and the binding constraint
+The backend build is the binding constraint: three backend engineers carry about 19 person-
+weeks of custom work across weeks 2-8 against 21 available, so there is little slack and the
+schedule depends on the week-3 spikes closing cleanly. To keep the pilot credible the heaviest
+items are deliberately phased: the pilot audit log is append-only (hash-chaining and WORM
+export move to scale-up), escalation ships with a basic rule set, and the SMS channel is
+deferred to scale-up (the pilot uses ELEVATE email plus in-app notification). If a slip occurs
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+after gate G2, the de-scope order is: SMS first (already deferred), then the mentoring expert-
+support UI (fall back to a manual request), then the analytics outbox (dashboards from data-
+pipeline only) - never access control, evidence handling or audit. Frontend has no slack either:
+one engineer owns the field-app customisation and one the web module for the full build, so
+the three-language and GPS work (B21) is the first frontend item to compress if needed.
+
+12.6 Scale-up decision point
+Gate G5 (week 12) is a readiness and adoption gate: wave 1 has been live for about two weeks,
+so it decides scale-up to 150 hospitals in district waves of about 25 hospitals per month. It
+uses the success criteria in section 13.3. Scale-up adds content, districts and capacity, and
+completes the phased items (hash-chained and WORM audit, SMS channel, additional
+checklist families); it does not change service ownership or data boundaries. The gate also
+decides whether AI shadow mode starts in the first scale-up wave (section 5.3), using the
+hardening status of the AI tools and the labelled test set built from pilot officer verdicts (B36).
+
+12.7 Upstream contribution track
+The Edge compensates for ELEVATE gaps only until they are fixed upstream. Week 1: private
+disclosure of V1, V5b and V6 to the maintainers with the reproduction scripts (B33). Weeks 2-4:
+small pull requests for the V1 (signing scoped to the caller), V5b (fail-closed ownership check)
+and C8 (server-side scope) fixes, once the maintainers agree (B34). Weeks 4-6: a design
+proposal (RFC) for task assignment and review states in project-service, using the self-creation
+portal review statuses (C42) as prior art (B35). Each Edge rule names the upstream fix that
+retires it; when an ELEVATE release with the fix is adopted and V1-V6 pass without the rule, the
+rule is removed, so the Edge shrinks over time towards a route allow-list plus scope injection.
+
+
+13. Testing and acceptance
+13.1 Representative scenarios
+ Type            Scenario                                              Expected result
+
+ Functional      Baseline ward assessment with all question            Submission completed; scores
+                 types, photos and declaration                         computed; event published
+ Functional      Completed assessment produces a draft plan;           Plan with tasks, owners and due
+                 officer accepts it                                    dates; audit records written
+ Functional      Supervisor rejects evidence twice                     Escalation raised to next level; owner
+                                                                       unchanged
+ Functional      High-risk task verified by supervisor                 Cannot close until IPC officer or
+                                                                       district validates
+ Functional      Repeat assessment after a checklist version           Comparison uses the correct
+                 change                                                baseline and versions
+ Integration     HR marks a user inactive                              User deactivated in ELEVATE next
+                                                                       cycle; open tasks flagged for
+                                                                       reassignment
+ Integration     Email notification fails to deliver (SMS failure      Failure logged; in-app notification
+                 receipts are tested at scale-up)                      shown; retry scheduled
+ Integration     Signed evidence URL retrieved then reused             Expired URL re-requested; access still
+                 after expiry                                          scope-checked
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ Type            Scenario                                              Expected result
+
+ Integration     OTP sign-in, then an action across services           Token maps to the ELEVATE user;
+                                                                       scope enforced end to end
+ Offline         7 days offline, 3 assessments, 20 photos, then        All items sent once, in order; no
+                 reconnect on a weak network                           duplicates
+ Offline         Two devices edit the same task                        Second write refused with 409; user
+                                                                       resolves; nothing lost silently
+ Security        Re-run V1 to V6 against the Edge                      Every cross-facility read and write
+                                                                       refused; forged token refused
+ Security        External penetration test and authenticated           No open critical or high findings
+                 scan
+ Performanc      Pilot load x3: 750 users, 150 concurrent syncs,       p95 API < 2 s; no errors above 0.5%
+ e               20 uploads per second
+ Performanc      Full-scale projection: 2,500 users, month-end         Capacity plan confirmed for scale-up
+ e               peak
+ UAT             Each actor completes their journeys in 3              Signed UAT report
+                 hospitals in English and the two state
+                 languages
+ Recovery        Restore MongoDB and PostgreSQL to a point             Within RPO 15 min and RTO 4 h
+                 in time in UAT
+
+
+
+13.2 Evidence required before calling the pilot ready (gate G4)
+ Evidence                                                                                  Owner
+
+ Test summary report: all P1 scenarios passed; no open critical defects; known             QA
+ issues accepted by the programme owner
+ Security sign-off: penetration test report, V1-V6 regression green, secrets and           SEC
+ access review
+ Operations readiness: dashboards and alerts live, backup and restore drill                DO
+ record, runbooks, on-call rota
+ UAT sign-off in 3 hospitals, training completed for pilot users, translated               BA
+ content reviewed
+ Data protection check: no patient-identifiable fields; moderation process tested          LA
+
+
+
+13.3 Pilot success criteria (used at gate G5)
+ Measure                                                               Target
+
+ Wards with a completed baseline assessment                            >= 90% of wave-1 wards by the end
+                                                                       of the pilot; every pilot ward within 3
+                                                                       weeks of its hospital going live
+ Plans created within 7 days of a baseline                             >= 90%
+ Critical tasks closed or escalated on time                            >= 90%
+ Sync success without user intervention                                >= 98% of outbox items
+ Security incidents involving cross-facility data                      0
+ Availability during working hours                                     >= 99.5%
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+    Measure                                                            Target
+
+    Audit-score change against baseline per ward                       Reported, not targeted: hospitals are
+                                                                       live for 1-2 weeks; the improvement
+                                                                       test runs at scale-up wave 1 plus 30
+                                                                       days
+
+
+
+
+14. Risks and trade-offs
+The programme is structured to retire its uncertainty early: the genuinely unknown items are
+proven in week-1-3 spikes behind gate G1, and every risk below has an owner, a mitigation
+already built into the plan, and a low or medium residual level once that mitigation is in place.
+None is open-ended.
+
+14.1 Highest risks and how they are controlled
+         Risk                       Mitigation already in the plan                      Own        Residu
+                                                                                        er         al
+
+         The state mandates         ELEVATE's own SSO configuration is checked          LA         Low
+         single sign-on later       in spike S4; the pilot uses ELEVATE login with
+                                    OTP, so the pilot is not blocked
+         An ELEVATE route is not    Deny-by-default allow-list; the V1-V6               SEC        Low
+         yet on the Edge allow-     regression runs on every release; threat
+         list                       model and pen test cover it
+         An upstream upgrade        Pinned image digests; the API and claim             LA         Low
+         changes a verified         registers plus V1-V6 are re-run before any
+         behaviour                  upgrade (11.3)
+         The field-app              Change set kept small and limited to named          FE         Low
+         customisation drifts       modules; rebased on each release tag
+         from upstream
+         Checklist content or       Authoring and translation start in week 1           BA         Mediu
+         translations arrive late   with the programme owner accountable                           m
+                                    (B01, B08)
+         Connectivity is worse      7-day offline design with an ordered outbox;        FE         Low
+         than assumed               a device dashboard surfaces stale items for
+                                    follow-up
+         A patient could appear     Capture-time constraints and declaration,           BA         Mediu
+         in an evidence photo       optional server-side image checks, and                         m
+                                    reviewer rejection with audited deletion (6.3)
+         Backend build is the       Pilot scope fixed at G1; heaviest items             PM         Mediu
+         tight path                 phased and a stated de-scope order (12.5);                     m
+                                    gates with exit evidence
+
+
+
+14.2 Rejected alternatives
+     Expose ELEVATE services directly to users: set aside because the verification showed
+      server-side gaps the edge must close (V1, V3, V5b).
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+   Fork project-service to add owners, approvals and escalation: set aside; a deep fork in
+    the busiest service would block upgrades. A separate service keeps ELEVATE upgradable.
+   Build the whole system custom: set aside; assessments, scoring, plans, sync, mentoring
+    and reporting already work and are maintained upstream.
+   Turn on ELEVATE Keycloak mode: set aside; the algorithm-confusion finding (V6) will be
+    disclosed privately in week 1 (B33) and the mode stays off until it is fixed.
+   Edit checklists in place: set aside; it would change how earlier submissions display (C12,
+    C13), so versions are published instead.
+
+14.3 Conditions that would change the recommendation
+   Upstream ELEVATE adds facility-scoped authorisation and ownership checks: the Edge
+    becomes thinner.
+   Spike S1 shows the IPC templates need more than importFromLibrary: plan structure
+    moves into the Workflow Service, with project-service used for display.
+   The state mandates a different identity or hosting model: Edge identity and deployment
+    change, the services do not.
+   Scale-up adds clinical-data needs: a separate, compliant system would be required; this
+    design stays outside the patient-record boundary.
+
+
+15. Technical validation by NavaDhiti
+Before committing to this design, NavaDhiti tested its riskiest assumption on running ELEVATE
+services. Assumption tested: "ELEVATE enforces organisation-scoped access to evidence and
+assessment data, so a facility user cannot read or change another facility's records." These are
+checks of ELEVATE itself, run on a standard ELEVATE install with test users; they are not a
+prototype of the proposed solution. Supporting checks cover targeting, offline conflicts, event
+publication and token verification, because the architecture depends on them. Each result
+below is labelled RUNTIME (observed against a running service) or CODE (confirmed in source,
+not reproduced end to end).
+
+15.1 Method
+   Verified against a running ELEVATE deployment of the services in section 3. Two users
+    were created through the account sign-up API in two different organisations of the same
+    tenant (Hospital A and Hospital B).
+   Evidence upload and retrieval were exercised against an S3-compatible object store
+    configured for the project-service; one project-service instance was additionally run with
+    AUTH_METHOD=KEYCLOAK_PUBLIC_KEY to test V6. No upstream code was changed.
+   The verification scripts and the full request and response logs are in the technical-evidence
+    pack (v1-v6, v4b, v5b, plus the API and code-claim registers verify_apis.py and
+    verify_claims.py).
+
+15.2 Observed results
+Sub-IDs such as V2 A1 or V3 T6 refer to individual steps in each test's log (validation/*_results.log).
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+ #     Test                          Observed                                                      Label
+
+ V1    User B asks project-          HTTP 200, URL issued; the download returned user A's          RUNTIM
+       service to sign a read        file content. The no-token files/download route was also      E (read
+       URL for user A's evidence     accepted (HTTP 200) and proxies to the configured object      of A's
+       object key, then              store, so that path is a code-level read capability. The      object
+       downloads it                  presign for user B used B's own sub-folder, not A's.          by B);
+                                     Control: anonymous getDownloadableUrl refused (401).          CODE
+                                                                                                   (no-
+                                                                                                   token
+                                                                                                   route)
+ V2    Calls without a user          scheduler jobs/list HTTP 200 with no token; entity details    RUNTIM
+       token                         HTTP 200 with only a tenant header; project, samiksha         E
+                                     and user APIs refuse (401); a mentee token is refused on
+                                     the org-admin API.
+ V3    Plan targeting for user B     Both users received the same 4 improvement solutions;         RUNTIM
+       vs user A with the same       an empty body returned 0; an unrelated location also          E
+       request body                  returned 4. Targeting follows the request body, not the
+                                     token's organisation. Auto-create via userProjects/details
+                                     returned HTTP 500 (a response-shape mismatch in the
+                                     helper).
+ V4    Two offline devices with      Both HTTP 200; the stale write replaced the newer one;        RUNTIM
+       the same download             lastDownloadedAt never changed; an identical replay           E
+       token update one task         was accepted and added a history entry.
+ V5    A full assessment             Completion accepted; two events on                            RUNTIM
+       submission completed          elevate_observations_dev (inprogress, completed) with         E
+       on a target entity;           entityId, submissionNumber, createdBy, tenantId, orgId;       (event);
+       completion event              the gpslocation header was stored. The role/location          CODE
+       published                     check is skipped when the client omits its profile.           (role
+                                                                                                   skip)
+ V5    User B (org hosp_b)           HTTP 200; B's answers (value R4, remark 'written by user      RUNTIM
+ b     posts a draft evidence        B') stored in A's submission (owner createdBy=7, orgId        E
+       update to a submission        default_code), submittedBy=8. The ownership check fails
+       owned by user A (org          open when the organisation does not match, and the
+       default_code)                 write path then loads the submission by its id only.
+                                     Reproducible from the v5b script.
+ V6    project-service started in    At the library level, jwt.verify with the service's exact     CODE
+       KEYCLOAK_PUBLIC_KEY           options (algorithms sha1/RS256/HS256, jsonwebtoken
+       mode; a token signed          8.5.1) accepts an HS256 token signed with the public key
+       HS256 with the mounted        (v6_jwt_alg_confusion). Against the running service the
+       RSA public key is sent        same forged token was REJECTED (HTTP 401,
+                                     v6_keycloak_mode_runtime). So this is a code/library
+                                     weakness, not a demonstrated runtime exploit.
+ Re    API and code registers        API register: all 63 cited routes are declared and present    Mixed
+ g.                                  in code; 59 return a non-500 response at runtime and 4
+                                     (observations/updateEntities, templates/details,
+                                     getDownloadableUrl, mentors/list) return HTTP 500
+                                     (route live, downstream error), marked accordingly.
+                                     Code-claim register: 49/49 code claims confirmed.
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+15.3 Limitations
+   The running services used released images (3.4.x); the inspected source is the branch head
+    listed in section 3, and each finding's code is present at the inspected commit.
+   V1 shows the project-service signs a URL for any caller; this is independent of the object
+    store used.
+   User B's second-organisation membership was provisioned directly; sign-up and login
+    used the account APIs.
+   V6 is confirmed at the library level; it did not reproduce against the running service in the
+    configuration tested, and that runtime negative is itself inconclusive (the control requests
+    returned the same 'token missing' response), so the decision to keep the mode off does
+    not rely on it.
+   Load, long-duration offline and multi-tenant behaviour were not tested; they are covered
+    in sections 9 and 13.
+
+15.4 Resulting architecture decisions
+   D2 Programme Edge as the only public entry point, with server-side scope, an ownership
+    map and a route allow-list (V1, V3, V5b).
+   D4 Evidence service for all signing and retrieval; ELEVATE file routes blocked at the Edge
+    (V1).
+   Edge idempotency and plan-version conflict checks (section 8.3) instead of relying on
+    lastDownloadedAt (V4).
+   Plans created through importFromLibrary, not the targeted auto-create path (V3).
+   D6 ELEVATE stays on native authentication. The Keycloak weakness, like V1 and V5b, will be
+    disclosed privately to the maintainers in week 1 of delivery (backlog B33), with these
+    scripts as reproduction steps; no upstream contact has been made yet (V6).
+
+
+
+
+NavaDhiti | Proposal to ShikshaLokam: ELEVATE for the hospital IPC quality-improvement programme
+

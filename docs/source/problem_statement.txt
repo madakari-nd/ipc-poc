@@ -1,0 +1,263 @@
+Hospital Infection Prevention and Quality
+Improvement Programme
+Problem statement for the NavaDhiti proposal to ShikshaLokam: adapting ELEVATE for a state health
+programme. This is a representative case used to show how NavaDhiti adapts and implements
+ELEVATE; the proposal answers the questions in section 8.
+
+
+
+1. The programme
+A State Health Quality Mission is launching a 12-month programme across 150 public hospitals in 12
+districts. The programme aims to reduce avoidable hospital-acquired infections by improving hygiene
+practices, infection-control audits, corrective actions and supervisory follow-up.
+
+The mission wants one digital system to coordinate the improvement programme without becoming a
+patient electronic medical record. The system must help facilities assess current practices, create and
+execute improvement plans, capture evidence, obtain supervisor validation, arrange expert support and
+demonstrate measurable improvement over repeated assessment cycles.
+
+
+
+2. Operating context
+Area            Business context
+
+
+                150 public hospitals across 12 districts; district, sub-district and community hospitals have
+Facilities
+                different ward structures and standards.
+
+
+                Approximately 2,500 named users: state administrators, district quality managers, hospital
+Users
+                infection-control officers, ward supervisors, frontline staff, expert mentors and external auditors.
+
+
+                Many facilities have intermittent connectivity. Assessments, task updates and evidence capture
+Connectivity
+                must continue offline and synchronise safely later.
+
+
+                The user experience must support English and two state languages. Programme content may
+Languages
+                differ by facility and ward type.
+
+
+Programme
+                Pilot in 15 hospitals within 12 weeks, followed by phased scale-up to all facilities.
+horizon
+
+
+                No patient-identifiable clinical data may be stored. Facility, staff, audit, evidence and improvement
+Data boundary
+                records are in scope.
+3. Primary actors
+Actor                           Expected responsibility
+
+
+State programme                 Configures programme structure, standards, assessment cycles, roles and state
+administrator                   reporting.
+
+
+                                Monitors hospitals, assigns support, reviews escalations and approves selected
+District quality manager
+                                closures.
+
+
+Hospital infection-control      Coordinates facility assessments, creates improvement plans and reviews ward
+officer                         progress.
+
+
+Ward supervisor                 Assigns actions, verifies evidence, requests corrections and escalates blockers.
+
+
+Frontline staff member          Completes assigned actions, records status and submits evidence.
+
+
+Expert mentor                   Supports low-performing facilities or wards and records agreed follow-up actions.
+
+
+                                Performs independent assessments and reviews immutable evidence and action
+External auditor
+                                history.
+
+
+
+
+4. Required business journeys
+Journey             Required behaviour
+
+
+                    Configure facility hierarchies, ward types, programme cycles, checklists, risk rules, role
+Programme setup assignments and target dates. A checklist version already in use must remain auditable when a
+                    new version is published.
+
+
+                    An infection-control officer or auditor completes a structured assessment by ward, including
+Baseline
+                    scored questions, observations, notes, geotagged and timestamped media, and a declaration.
+assessment
+                    Work must be possible offline.
+
+
+                    Assessment findings generate or inform a plan containing goals, milestones and corrective
+Improvement plan tasks. Tasks may have owners, due dates, dependencies, evidence requirements and approval
+                    rules.
+
+
+Execution and       Staff update tasks and submit evidence. A ward supervisor accepts, rejects or requests new
+verification        evidence. High-risk actions require infection-control officer or district validation before closure.
+
+
+                    Overdue critical actions and repeated evidence rejection are escalated according to
+Escalation
+                    configurable rules. Escalation must not silently change the original owner or history.
+
+
+                    A facility requests an expert mentor for a defined problem. The mentor is matched by expertise,
+Expert support      language and availability. Agreed actions return to the facility improvement plan and are
+                    tracked to closure.
+Journey              Required behaviour
+
+
+Repeat               The programme runs periodic reassessments and compares results against the correct prior
+assessment           baseline, checklist version, ward and facility context.
+
+
+                     District and state teams view completion, overdue critical actions, repeated failures,
+Programme
+                     improvement trends and data-quality exceptions. Operational systems remain the sources of
+oversight
+                     truth.
+
+
+
+
+5. Required integrations
+External system                 Integration need
+
+
+Government identity or HR
+                                User identity, employment status and selected role or facility assignments.
+system
+
+
+Facility master                 Authoritative facility codes, hierarchy, location and operational status.
+
+
+                                Approved SMS or messaging notifications and reminders; consent and delivery
+Messaging provider
+                                status must be recorded.
+
+
+                                Photos, documents and other evidence with controlled access, retention and signed
+Object storage
+                                retrieval.
+
+
+                                Governed events or extracts for programme reporting without bypassing operational
+State analytics platform
+                                ownership.
+
+
+
+
+6. Non-functional and governance constraints
+    • Organisation and role-based access must prevent users from viewing unauthorised facilities,
+         wards or evidence.
+    • Every assessment, plan revision, task decision, evidence review and administrative change must
+         be attributable and auditable.
+    • Offline synchronisation must address duplicates, conflicting updates, media retries and reference-
+         data version changes.
+    • The pilot must support 15 hospitals and scale to 150 without redesigning service ownership or
+         data boundaries.
+    • Programme configuration and operational data must be separated across development, test, UAT
+         and production environments.
+    • The proposed design must include monitoring, backup, recovery, security patching and controlled
+         releases.
+
+
+
+7. Guiding principle
+Do not assume that ELEVATE must meet every requirement. The solution should use ELEVATE where
+its capabilities and service boundaries fit, and explicitly place unsuitable responsibilities in external
+systems or programme-specific components.
+
+The proposal should validate one high-risk assumption in its design with a focused code or runtime
+check. Examples include organisation-scoped access, assessment-to-project orchestration, audit
+behaviour, event publication or evidence handling. The proposal should state the validation method,
+code or configuration used, observed result, limitations and resulting architecture decision.
+
+
+
+8. Questions the proposal must answer
+Question area             What the proposal must answer
+
+
+Executive                 State whether and how ELEVATE should be used, the most important design decisions,
+recommendation            the main gaps and the recommended pilot boundary.
+
+
+Requirement               Decompose the case into capabilities, actors and journeys. List assumptions and the
+interpretation            questions you would ask programme stakeholders before committing delivery.
+
+
+                          Map each requirement to exact ELEVATE service or repository candidates. Provide
+ELEVATE capability
+                          upstream URLs, branches or releases, and the commit or version inspected. Mark all
+mapping
+                          mappings that still require code or API validation.
+
+
+                          Classify each capability as use as-is, configuration, maintained ELEVATE extension,
+Adaptation decision
+                          separate custom component, or external integration. Explain the reason and maintenance
+matrix
+                          consequence.
+
+
+                          Provide a readable diagram showing experience channels, API or interface boundary,
+Logical architecture      ELEVATE services, custom components, external systems, events, data stores, object
+                          storage and trust boundaries.
+
+
+Domain and data           Define the principal entities and the authoritative service for each. Include versioning,
+ownership                 audit history, evidence metadata and the boundary that excludes patient-identifiable data.
+
+
+                          Describe or diagram at least three end-to-end sequences: baseline assessment to
+Workflow design           improvement plan; task evidence to validated closure; and expert-support request to plan
+                          follow-up.
+
+
+API and event             Identify the principal synchronous APIs and asynchronous events, their producers and
+contracts                 consumers, authentication model, idempotency approach and error or retry behaviour.
+
+
+                          Explain what is stored on the client, how reference data and form versions are managed,
+Offline approach
+                          how conflicts are detected and resolved, and how media uploads recover from failure.
+
+
+                          Cover organisation scoping, roles, consent where relevant, audit, secrets, data retention,
+Security and operations
+                          logging, metrics, alerting, backup, recovery and environment separation.
+
+
+Repository and            Identify upstream dependencies, proposed forks or extension repositories, deployment
+deployment strategy       units, runtime dependencies and how future ELEVATE upgrades will be reconciled.
+Question area          What the proposal must answer
+
+
+                       Propose a 12-week pilot plan with workstreams, sequence, dependencies, team
+Delivery plan          responsibilities, validation spikes, milestones, acceptance gates and a scale-up decision
+                       point.
+
+
+Testing and            Define representative functional, integration, offline, security, performance and UAT
+acceptance             scenarios. State what evidence is required before calling the pilot ready.
+
+
+                       List the highest technical and delivery risks, rejected alternatives and the conditions that
+Risks and trade-offs
+                       could change your recommendation.
+
