@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-22
 
-**Status**: Draft (clarify round 1 applied)
+**Status**: Ready for plan (clarify rounds 1 and 2 applied)
 
 **Input**: User description: "Build a demo-ready POC of the NavaDhiti IPC solution (proposal v2.0 and
 pitch deck) on a real, running ELEVATE install, covering all 8 business journeys of the hospital
@@ -20,8 +20,9 @@ after the state has published its IPC checklist. An IPC officer audits Ward 4 of
 hand-rub at 3 beds → the finding becomes a critical task with an owner, due in 7 days, photo proof
 required → frontline staff fit dispensers and upload proof offline → the supervisor rejects a
 blurry photo and accepts the retake, the officer validates → a critical task that runs late is
-escalated to the district → an expert mentor is matched and agreed actions return to the plan →
-an external auditor re-assesses Ward 4 against the same baseline and checklist version →
+escalated to the IPC officer after 48 hours and to the district after 7 days → an expert mentor is matched and agreed actions return to the plan →
+an external auditor re-assesses Ward 4 against the same baseline and checklist version, the
+district quality manager releases the result to the hospital →
 district and state views show what was fixed, what is late and the trend. Time-dependent steps
 ("7 days later", "a month later") use the demo clock. Hospital B (District 2) exists so the demo
 can show that its users cannot see or change Hospital A's data.
@@ -47,13 +48,27 @@ can show that its users cannot see or change Hospital A's data.
   added; only real production hosting, partner systems, live SMS and third-party pen testing stay
   out of scope.
 
+### Session 2026-11-22 (round 2)
+
+- Q: Are external-auditor results visible to the hospital at once? → A: No (proposal A12): held
+  until the district quality manager reviews and releases them.
+- Q: How are restore drill, rollback and load test proven? → A: As scripted release checks run
+  before each release; all other production qualities run continuously in the pipeline.
+- Q: Keep full scope or trim minor items? → A: Keep full scope.
+- Author fixes from round-2 evaluation: escalation defaults aligned to proposal A11; "blocked" is
+  a flag; readiness vs degradation split; environment profiles mapped to the brief and separated
+  on the shared ELEVATE install; plan creation rules for same-cycle and no-failure repeats;
+  baseline definition; device clock rule; mentoring completion rule; untestable phrases replaced;
+  evidence retention per A6; evidence storage location; role-to-app mapping; supervisor assigns
+  owners; ward-type checklist sections (A15); demo "run sweep now".
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Programme setup (Priority: P1)
 
 The state programme administrator sets up the programme: state → district → hospital → ward
 hierarchy with ward types, the 7 roles and who is assigned to which facility/ward, an assessment
-cycle with target dates, an IPC ward checklist with scoring and a risk level per question, the
+cycle with target dates, an IPC ward checklist with ward-type sections, scoring and a risk level per question, the
 plan template linked to it with a task for each question that can fail, and escalation rules.
 Publishing a new checklist version keeps the old version and every assessment done on it intact
 and auditable.
@@ -106,9 +121,9 @@ photos linked.
 2. **Given** a completed offline assessment, **When** the device reconnects, **Then** photos
    upload first, the assessment is submitted once, and the item shows "sent".
 3. **Given** the upload is interrupted halfway, **When** sync resumes, **Then** no duplicate
-   submission or photo is created and nothing is lost.
+   submission or photo is created, and the stored photo count and fingerprints match the device.
 4. **Given** the declaration is not ticked, **When** the officer submits, **Then** submission is
-   blocked with a clear message.
+   blocked and the message "Confirm the no-patient-data declaration" is shown.
 5. **Given** each photo, **When** it is reviewed later, **Then** it shows capture time, GPS (or
    "GPS unavailable"), who took it and its content fingerprint.
 6. **Given** checklist v2 is published while a v1 draft is open offline, **When** the device
@@ -145,9 +160,13 @@ programme layer with owners and rules.
    draft plan exists.
 4. **Given** an assessment with no failed questions, **When** it completes, **Then** no draft plan
    is created and the officer sees "no actions needed".
-5. **Given** a repeat assessment in a new cycle, **When** it completes, **Then** a new draft plan
-   is created for that cycle, and still-open tasks of the previous plan are listed as carried
-   over (linked, not copied).
+5. **Given** a repeat assessment in a new cycle with failed questions, **When** it completes,
+   **Then** a new draft plan is created for that cycle, and still-open tasks of the previous plan
+   are listed as carried over (linked, not copied); **Given** no failed questions, **Then** no new
+   plan is created and open tasks stay tracked on the previous plan.
+7. **Given** a second assessment of the same ward in the same cycle, **When** it completes,
+   **Then** no new plan is created; the officer sees its failed questions and may add tasks to the
+   current plan as a revision.
 6. **Given** an active plan, **When** the officer adds, removes or changes a task, **Then** a new
    plan revision is recorded with reason and the change is visible in plan history.
 
@@ -184,7 +203,8 @@ and accepts the retake; officer validates; confirm task closed and full history 
    created; the closed task is not changed.
 7. **Given** a task with an unmet dependency, **When** the owner tries to start it, **Then** it is
    blocked with a message naming the blocking task.
-8. **Given** an owner leaves or is unavailable, **When** the supervisor reassigns the task with a
+8. **Given** a task in the supervisor's ward (the supervisor assigns and reassigns owners in their
+   wards), **When** the supervisor reassigns the task with a
    reason, **Then** the new owner sees it, the state is unchanged, and history keeps the old owner.
 
 ---
@@ -199,21 +219,23 @@ or rewrites history. A ward supervisor can also raise a manual escalation for a 
 **Why this priority**: required by the brief; depends on US3–US4.
 
 **Independent Test**: with a seeded critical task, move the demo clock 7 days past due; run the
-escalation sweep; confirm an escalation record and notification to the district quality manager
+escalation sweep (on schedule, or "run sweep now" in demo mode); confirm an escalation record and notification to the district quality manager
 with owner unchanged.
 
 **Acceptance Scenarios**:
 
-1. **Given** a critical task 7 days overdue and a rule "critical overdue ≥ 7 days → district
-   quality manager", **When** the sweep runs, **Then** an escalation record (rule, level, target,
-   time) is created and the district quality manager is notified in-app and by email.
-2. **Given** a task returned 3 times and a rule "rejections ≥ 3 → IPC officer", **When** the third
-   return happens, **Then** the IPC officer is notified.
+1. **Given** default rules (proposal A11) R1 "critical overdue ≥ 48 h → IPC officer" and R2
+   "critical overdue ≥ 7 days → district quality manager", **When** the sweep runs at 48 h and
+   again at 7 days, **Then** an escalation record (rule, level, target, time) is created at each
+   level and the target is notified in-app and by email.
+2. **Given** rule R3 "returned 2 times → the level above whoever returned it", **When** the
+   second return happens, **Then** that level is notified.
 3. **Given** any escalation, **When** the task is viewed, **Then** owner and history are unchanged
    and the escalation appears as an added entry.
 4. **Given** the sweep runs twice for the same condition, **When** it completes, **Then** no
    duplicate escalation is created.
-5. **Given** a ward supervisor marks a task as blocked with a reason, **When** they escalate it,
+5. **Given** a ward supervisor flags a task as blocked with a reason (a flag with actor and time,
+   not a task state), **When** they escalate it,
    **Then** the IPC officer is notified and the escalation is recorded as manual.
 
 ---
@@ -236,8 +258,10 @@ appear as tasks in the plan.
 **Acceptance Scenarios**:
 
 1. **Given** mentors with expertise {hand hygiene, Hindi}, {waste, English}, **When** the officer
-   requests help on hand hygiene in Hindi, **Then** the first mentor is ranked first.
-2. **Given** a mentor accepts a session, **When** they record 2 agreed actions, **Then** 2 tasks
+   requests help on hand hygiene in Hindi, **Then** the first mentor is ranked first (availability = at least one open slot in the next 14
+   days of programme time).
+2. **Given** a mentor accepts the session request in ELEVATE, **When** after the session they
+   mark it held and record 2 agreed actions in the programme layer (no meeting link needed), **Then** 2 tasks
    are added to the Ward 4 plan as a plan revision, with owners proposed by the officer and the
    request linked.
 3. **Given** a mentor, **When** they open the facility, **Then** they see only facilities with an
@@ -248,8 +272,10 @@ appear as tasks in the plan.
 ### User Story 7 - Repeat assessment and comparison (Priority: P2)
 
 A month later (demo clock) the external auditor re-assesses Ward 4. The result is compared against
-the correct baseline: same ward, same facility, checklist version recorded, per-section and total
-score change.
+the correct baseline — the latest completed assessment of the same ward in the previous cycle —
+with checklist versions recorded and per-section and total score change; the trend view shows all
+cycles. External results stay hidden from the hospital until the district quality manager
+releases them (proposal A12).
 
 **Why this priority**: shows "measurable improvement over cycles".
 
@@ -261,10 +287,13 @@ shows both scores, the checklist versions used and the change per section.
 1. **Given** a baseline on v1 and a repeat on v1, **When** the comparison is opened, **Then**
    scores are compared section by section.
 2. **Given** a baseline on v1 and a repeat on v2, **When** the comparison is opened, **Then** only
-   questions with the same programme key and unchanged wording are compared, and the version
-   difference is clearly labelled.
+   questions with the same programme key and the same question-text fingerprint are compared; the
+   rest are listed under "Not comparable (version change)".
 3. **Given** an external auditor, **When** they open plans and evidence for an assigned facility,
    **Then** they can read them and their history but cannot change anything.
+4. **Given** an external re-assessment is completed, **When** hospital users open their ward,
+   **Then** the result is not visible until the district quality manager releases it; the release
+   is recorded in the audit history.
 
 ---
 
@@ -320,8 +349,8 @@ alter one record directly in storage and confirm verification reports it.
    **Then** the broken record is reported.
 7. **Given** an internal-only service route (e.g. scheduling), **When** it is called from the
    public entry point, **Then** it is not reachable.
-8. **Given** more than the allowed number of requests per minute from one user, **When** more
-   arrive, **Then** they are refused with a "slow down" response.
+8. **Given** a user exceeds 120 requests per minute (configurable), **When** more arrive, **Then**
+   they are refused with a "too many requests" response until the minute passes.
 
 ---
 
@@ -329,8 +358,8 @@ alter one record directly in storage and confirm verification reports it.
 
 - Device clock is wrong: capture time is kept, server receipt time is recorded, and skew over 10
   minutes is flagged as a data-quality exception.
-- Photo upload link expires mid-upload: a new link is requested automatically; the user sees no
-  error.
+- Photo upload link expires mid-upload: a new link is requested automatically; no error state is
+  shown and the item ends as "sent".
 - User is removed or moved to another hospital (staff file change) while holding offline work:
   pending items for the old scope are refused on sync with a clear "your access changed" message.
 - ELEVATE service is down: the affected screen says which function is unavailable; queued writes
@@ -341,8 +370,9 @@ alter one record directly in storage and confirm verification reports it.
 - Same ward assessed twice in one cycle: the second is recorded as a separate submission; the
   baseline link stays on the first unless the officer changes it with a reason.
 - Free text over 500 characters is refused, with a counter shown while typing.
-- No sign-in for 7 days: from day 5 the app warns the user to connect; after 7 days local data is
-  cleared (as the proposal requires); unsent items older than the limit are listed by the Edge from
+- No sign-in for 7 days: limits use device time (an offline device cannot see the server demo
+  clock; tests control device time); from day 5 the app warns the user to connect; after more
+  than 7 × 24 hours local data is cleared (as the proposal requires); unsent items older than the limit are listed by the Edge from
   device telemetry so the supervisor can follow up.
 - ELEVATE records an assessment as completed only after scoring finishes; the 1-minute plan target
   starts from that moment.
@@ -362,7 +392,8 @@ alter one record directly in storage and confirm verification reports it.
   hospital IPC officer, ward supervisor, frontline staff, expert mentor, external auditor) and
   assign each user a scope (state, district, hospital, wards, or own tasks) with validity dates.
 - **FR-004**: System MUST let the administrator define assessment cycles with target dates.
-- **FR-005**: System MUST keep a checklist catalogue: every published version is immutable, has a
+- **FR-005**: System MUST keep a checklist catalogue: one checklist family with ward-type sections
+  (proposal A15); every published version is immutable, has a
   version number and a fingerprint of its question set, gives each question a stable programme key
   and a risk level (critical / high / normal) and pass mark, and remains readable with all
   assessments done on it.
@@ -377,15 +408,17 @@ alter one record directly in storage and confirm verification reports it.
 - **FR-008**: Every photo MUST carry capture time, GPS (or an explicit "GPS unavailable" flag),
   uploader and content fingerprint.
 - **FR-009**: Sync MUST send photos before the record that references them, and MUST never create
-  duplicates on retry.
+  duplicates on retry. Photos are stored only in the programme evidence locker; ELEVATE assessment
+  answers and plan tasks carry the evidence ID, never the file.
 - **FR-010**: System MUST record for each assessment: ward, checklist version, cycle, assessor type
   (internal / external), baseline link and declaration.
 
 **Plans, tasks and verification**
 
-- **FR-011**: On assessment completion, System MUST create at most one draft improvement plan,
-  containing the mapped template task for each question answered below its pass mark, with
-  defaults from the question's risk level; no failed questions means no plan.
+- **FR-011**: On completion of a ward's first assessment in a cycle, System MUST create at most one
+  draft improvement plan, containing the mapped template task for each question answered below its
+  pass mark, with defaults from the question's risk level; no failed questions means no plan;
+  later assessments of the same ward in the cycle create no plan.
 - **FR-012**: The IPC officer MUST be able to edit and approve the draft (owners, goals,
   milestones, dependencies); approval creates the ward's plan for that cycle in ELEVATE.
 - **FR-013**: Tasks MUST follow these states, each moved only by the listed role:
@@ -393,7 +426,8 @@ alter one record directly in storage and confirm verification reports it.
   CHANGES_REQUESTED (supervisor returns) → back to EVIDENCE_SUBMITTED (owner); VERIFIED → CLOSED for
   normal tasks, or → PENDING_VALIDATION for critical/high → CLOSED (IPC officer or district quality
   manager validates) or CHANGES_REQUESTED (validator returns). Each return increments the task's
-  rejection count. Reassignment by the supervisor changes owner only, never state.
+  rejection count. Ward supervisors assign and reassign owners in their wards; reassignment changes
+  owner only, never state. "Blocked" is a flag (reason, actor, time), not a state.
 - **FR-014**: Every return and validation decision MUST carry a reason from a list plus optional
   text.
 - **FR-015**: Closed tasks MUST NOT change; reopening creates a new linked task.
@@ -403,13 +437,18 @@ alter one record directly in storage and confirm verification reports it.
   mentor-agreed actions) MUST create a numbered plan revision with actor and reason.
 - **FR-018**: A repeat assessment in a new cycle MUST create its own draft plan and link the
   previous plan's still-open tasks as carried over.
+- **FR-018a**: Each ward plan in ELEVATE MUST be owned by that ward's programme service account,
+  and each cycle MUST use its own ELEVATE plan solution, because ELEVATE allows one plan per user
+  per solution (proposal 7.2); the seed provisions these accounts.
 - **FR-019**: ELEVATE's copy of the plan MUST be kept in line with the programme's task state by a
   one-way reconciliation that records every correction in the audit history.
 
 **Escalation and notifications**
 
-- **FR-020**: System MUST evaluate configurable escalation rules (critical overdue by N days,
-  rejections ≥ N) on a schedule and on each return, notify the target role, and never change owner
+- **FR-020**: System MUST evaluate configurable escalation rules (defaults per proposal A11:
+  critical overdue ≥ 48 h → IPC officer; ≥ 7 days → district quality manager; returned 2 times →
+  the level above whoever returned it) on an hourly schedule, on each return, and on demand in demo
+  mode, notify the target role, and never change owner
   or history; supervisors MUST be able to raise a manual escalation with a reason.
 - **FR-021**: Notifications MUST be delivered in-app (stored and shown as unread until opened) and
   by email through ELEVATE's notification service; an SMS stand-in MUST record consent, template,
@@ -419,16 +458,21 @@ alter one record directly in storage and confirm verification reports it.
 
 - **FR-022**: The IPC officer or district quality manager MUST be able to raise a support request
   (ward, problem, IPC skill, preferred language) and get a mentor shortlist from ELEVATE mentoring,
-  ranked by skill match, then language match, then availability.
+  ranked by skill match, then language match, then availability (at least one open slot in the
+  next 14 days of programme time). Session completion and agreed actions are recorded in the
+  programme layer once ELEVATE shows the request as accepted.
 - **FR-023**: Mentor-agreed actions MUST be added to the ward plan as tasks linked to the request.
 
 **Repeat assessment and oversight**
 
 - **FR-024**: System MUST compare a repeat assessment with its baseline by ward, facility and
-  checklist version, section by section, comparing only questions with the same programme key and
-  labelling the rest.
+  checklist version, section by section — the baseline is the latest completed assessment of the
+  same ward in the previous cycle — comparing only questions with the same programme key and
+  question-text fingerprint and listing the rest as "Not comparable (version change)".
+- **FR-024a**: External-auditor results MUST stay hidden from hospital users until the district
+  quality manager releases them; the release is audited.
 - **FR-025**: System MUST show district and state oversight: completion, overdue critical tasks,
-  repeated failures (rejection count ≥ 3 or same question failed in 2 cycles), score trend, and
+  repeated failures (rejection count ≥ 2 or same question failed in 2 consecutive cycles), score trend, and
   data-quality exceptions, limited to the viewer's scope.
 - **FR-026**: Data-quality exceptions MUST include: photo without GPS, GPS more than 1 km from the
   hospital, device clock skew over 10 minutes, capture-to-upload over 7 days, the same photo
@@ -463,6 +507,8 @@ alter one record directly in storage and confirm verification reports it.
 - **FR-035**: Every screen MUST be available in English and Hindi; a Kannada file MUST exist and be
   switchable, even if partly translated.
 - **FR-036**: Each role MUST land on a "what needs me now" home showing only actions it may take.
+  Field app: frontline staff, ward supervisor, IPC officer, external auditor. Officer web: state
+  administrator, district quality manager, IPC officer, ward supervisor, expert mentor.
 - **FR-037**: The field experience MUST show each queued item as pending, sent or needs attention,
   and report its queue status to the server when online so supervisors see stale devices.
 - **FR-038**: The POC MUST provide a demo clock (visible banner when not real time; usable only by
@@ -472,25 +518,31 @@ alter one record directly in storage and confirm verification reports it.
   (District 1) and Hospital B (District 2), 3 wards each including Ward 4; 1 state administrator;
   1 district quality manager per district; per hospital 1 IPC officer, 1 ward supervisor, 2
   frontline staff; 3 expert mentors with different skills and languages; 1 external auditor;
-  checklist v1 with risk levels, plan template, risk defaults and escalation rules — plus a reset
+  checklist v1 with ward-type sections and risk levels, plan template, risk defaults, escalation
+  rules, per-ward programme service accounts and a plan solution per cycle — plus a reset
   command and a written demo script following the storyline.
 - **FR-040**: Automated tests MUST use a programme data set separate from the demo data so a test
-  run never changes the demo state.
+  run never changes the demo state (see NFR-001 for separation on the shared ELEVATE install).
 
 ### Non-Functional Requirements (almost production grade)
 
-- **NFR-001 Environments**: configuration and data MUST be separated for at least dev, test, demo
-  and a prod-like profile; each has its own programme database, storage bucket, event-topic
-  suffix and secrets; nothing is shared between them except the ELEVATE install it points at.
+- **NFR-001 Environments**: configuration and data MUST be separated into the brief's four
+  environments as profiles: dev, test, UAT (= demo) and production (= prod-like). Each has its own
+  programme database, storage bucket, event-topic suffix, event consumer group and secrets. On the
+  one shared local ELEVATE install, each profile uses its own ELEVATE organisation, users and
+  entities with a code prefix, and consumers ignore events from other organisations.
 - **NFR-002 Availability and recovery**: programme data MUST be backed up automatically at least
   every 15 minutes (recovery point ≤ 15 min) and restorable by one documented command within 1
-  hour (recovery time); a restore drill is part of the test suite.
+  hour (recovery time); the restore drill runs as a scripted release check.
 - **NFR-003 Observability**: every request MUST carry a correlation id across the entry point,
   programme services and ELEVATE calls; logs are structured and free of tokens and personal
   data; metrics cover request rate, errors, latency, queue/outbox depth, failed events and
-  escalation sweep results; dashboards and alerts exist for each.
-- **NFR-004 Health**: every service MUST expose liveness and readiness (readiness includes the
-  ELEVATE services it depends on) and shut down gracefully without losing in-flight work.
+  escalation sweep results; one operations dashboard and alerts for error rate, 95th-percentile
+  latency, outbox depth, dead letters and sweep failure.
+- **NFR-004 Health**: every service MUST expose liveness and readiness (readiness covers only its
+  own stores and broker, so an ELEVATE outage never takes it out of service) plus a dependency
+  status report for ELEVATE used for display and alerts; on shutdown it drains in-flight requests
+  within 30 s and acknowledges no event before its changes are committed.
 - **NFR-005 Security baseline**: TLS on the entry point; secure headers and strict content
   security policy on both apps; secrets never in source control; dependency and container image
   vulnerability scans with no unresolved critical findings; secret scanning on every commit;
@@ -498,10 +550,12 @@ alter one record directly in storage and confirm verification reports it.
 - **NFR-006 Releases**: every change goes through an automated pipeline (lint, type check, unit,
   contract, integration against ELEVATE, end-to-end, accessibility, security scans) before merge;
   releases are versioned, built once as images, and can be rolled back to the previous version
-  in under 10 minutes; database changes ship as versioned, reversible migrations.
+  in under 10 minutes (scripted release check); database changes ship as versioned, reversible
+  migrations.
 - **NFR-007 Performance**: at pilot scale (15 hospitals, 250 users, 50 concurrent) 95% of
-  officer-web and entry-point requests complete in under 500 ms excluding ELEVATE time, and the
-  system sustains 3× that load in a load test without errors.
+  officer-web and entry-point requests complete in under 500 ms of programme-layer time (ELEVATE
+  time measured separately), and the system sustains 3× that load in a load test run as a
+  release check.
 - **NFR-008 Capacity planning**: the plan MUST state expected volumes at pilot and at 150
   hospitals (users, assessments, photos and storage per month, events per day) and show the
   design holds without changing service ownership.
@@ -509,12 +563,14 @@ alter one record directly in storage and confirm verification reports it.
   timeouts, retries with backoff and circuit breaking; failed events go to a dead-letter store
   that can be replayed.
 - **NFR-010 Data retention**: evidence and audit history retention periods are configurable
-  (default: evidence 3 years, audit 7 years); deletion of patient-showing media follows FR-032.
+  (defaults per proposal A6: evidence 3 years after plan closure, audit 7 years, other records 5
+  years after programme end); deletion of patient-showing media follows FR-032.
 - **NFR-011 Documentation**: architecture overview, API reference generated from contracts,
   runbook (start, stop, backup, restore, rotate secrets, replay dead letters), and the demo
   script are kept in the repository.
 - **NFR-012 Code quality**: strict typing, zero lint errors, automated formatting, ≥ 80% line
-  coverage on programme business modules, and reviewed changes only.
+  coverage on programme business modules, and every change merged through a pull request with a
+  completed review checklist and passing pipeline.
 
 ### Key Entities
 
@@ -553,7 +609,7 @@ alter one record directly in storage and confirm verification reports it.
 - **SC-002**: 100% of the security test cases (V1, V2, V3, V4 stale + replay, V5b) are refused
   through the POC entry point; the test report also shows each case's result when sent directly
   to standard ELEVATE (where the local ELEVATE configuration allows it to run).
-- **SC-003**: An assessment with 3 photos made offline (7 days on the demo clock) syncs with zero
+- **SC-003**: An assessment with 3 photos made offline for 6 days 23 hours (device time) syncs with zero
   duplicates and zero lost photos in 10 out of 10 repeated runs, including runs with interrupted
   uploads.
 - **SC-004**: A draft plan is visible to the IPC officer within 1 minute of ELEVATE recording the
@@ -575,13 +631,17 @@ alter one record directly in storage and confirm verification reports it.
 - **SC-012**: The pipeline is green on the release candidate with zero unresolved critical
   vulnerabilities, and a rollback to the previous release completes in under 10 minutes.
 - **SC-013**: A load test at 3× pilot concurrency runs for 15 minutes with an error rate under
-  0.1% and 95th-percentile latency under 500 ms (excluding ELEVATE time).
+  0.1% and 95th-percentile programme-layer latency under 500 ms.
 
 ## Assumptions
 
 - ELEVATE runs locally (the existing local stack: user, entity-management, samiksha, project,
   mentoring from the add-ons, scheduler, notification, interface-service, Kafka). Starting it is a
   prerequisite, not part of the POC; a pre-flight check confirms each needed capability works.
+- Email delivery is proven through the local ELEVATE mail catcher (Mailpit); notification
+  templates are ELEVATE configuration and are listed in `docs/elevate-usage.md`.
+- ELEVATE's meeting service is off locally, so mentoring sessions are agreed through ELEVATE
+  session requests and their outcome is recorded in the programme layer.
 - Where ELEVATE needs configuration for a capability the POC uses (for example a storage bucket for
   bulk user upload or file links, the email channel, mentoring profile attributes, OTP for admin
   roles), the POC sets it through ELEVATE's own configuration (CONFIGURE mode), never by code

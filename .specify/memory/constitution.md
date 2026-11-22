@@ -175,6 +175,16 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - A journey is "done" only when its end-to-end test passes against real ELEVATE and its demo step
   is written in `docs/demo-script.md`.
 
+### XII. Simplicity and POC Discipline
+
+- YAGNI: no feature beyond the spec; no extra products (no Keycloak, Camunda, Temporal, OPA,
+  extra SSO, Kubernetes) — the proposal explicitly rejects them.
+- One command brings up the programme layer (`docker compose up`) against an already running
+  ELEVATE stack, plus one seed command that loads a demo state (hospitals A and B, wards, 7 role
+  users, a published IPC checklist and plan template).
+- AI services are out of the POC build (pilot has no AI on hospital data); integration points are
+  documented only.
+
 ### XIII. Almost Production Grade
 
 - The POC is built and operated as the pilot's first release, not a throwaway demo: separate
@@ -188,16 +198,6 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - "Simple" (Principle XII) means fewer moving parts, never lower quality: production qualities
   are achieved with the MERN stack plus the existing ELEVATE infrastructure, without new products
   beyond observability tooling justified in plan.md.
-
-### XII. Simplicity and POC Discipline
-
-- YAGNI: no feature beyond the spec; no extra products (no Keycloak, Camunda, Temporal, OPA,
-  extra SSO, Kubernetes) — the proposal explicitly rejects them.
-- One command brings up the programme layer (`docker compose up`) against an already running
-  ELEVATE stack, plus one seed command that loads a demo state (hospitals A and B, wards, 7 role
-  users, a published IPC checklist and plan template).
-- AI services are out of the POC build (pilot has no AI on hospital data); integration points are
-  documented only.
 
 ## Technology & Platform Constraints
 
