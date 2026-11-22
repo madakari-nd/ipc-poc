@@ -434,7 +434,7 @@ Then:          T092 domain + service → T093 routes → T096 E2E
 
 ### Totals
 
-129 tasks. T029–T128 were added by the analyze remediation; T029 belongs to Foundational and T007–T128 to Polish:
+129 tasks. T007, T029 and T128 were added by the analyze remediation; T007 belongs to Setup, T029 to Foundational and T128 to Polish:
 
 | Group | Tasks |
 |---|---|
