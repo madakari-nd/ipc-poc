@@ -164,11 +164,11 @@ programme layer with owners and rules.
    **Then** a new draft plan is created for that cycle, and still-open tasks of the previous plan
    are listed as carried over (linked, not copied); **Given** no failed questions, **Then** no new
    plan is created and open tasks stay tracked on the previous plan.
+6. **Given** an active plan, **When** the officer adds, removes or changes a task, **Then** a new
+   plan revision is recorded with reason and the change is visible in plan history.
 7. **Given** a second assessment of the same ward in the same cycle, **When** it completes,
    **Then** no new plan is created; the officer sees its failed questions and may add tasks to the
    current plan as a revision.
-6. **Given** an active plan, **When** the officer adds, removes or changes a task, **Then** a new
-   plan revision is recorded with reason and the change is visible in plan history.
 
 ---
 
@@ -426,7 +426,8 @@ alter one record directly in storage and confirm verification reports it.
   CHANGES_REQUESTED (supervisor returns) → back to EVIDENCE_SUBMITTED (owner); VERIFIED → CLOSED for
   normal tasks, or → PENDING_VALIDATION for critical/high → CLOSED (IPC officer or district quality
   manager validates) or CHANGES_REQUESTED (validator returns). Each return increments the task's
-  rejection count. Ward supervisors assign and reassign owners in their wards; reassignment changes
+  rejection count. VERIFIED is a pass-through state: it is recorded, then the task moves at
+  once to CLOSED or PENDING_VALIDATION. Ward supervisors assign and reassign owners in their wards; reassignment changes
   owner only, never state. "Blocked" is a flag (reason, actor, time), not a state.
 - **FR-014**: Every return and validation decision MUST carry a reason from a list plus optional
   text.
@@ -435,7 +436,7 @@ alter one record directly in storage and confirm verification reports it.
   differences shown to the user.
 - **FR-017**: Any change to an approved plan (task added, removed or changed, including
   mentor-agreed actions) MUST create a numbered plan revision with actor and reason.
-- **FR-018**: A repeat assessment in a new cycle MUST create its own draft plan and link the
+- **FR-018**: (Applies FR-011 to later cycles.) A repeat assessment in a new cycle MUST create its own draft plan and link the
   previous plan's still-open tasks as carried over.
 - **FR-018a**: Each ward plan in ELEVATE MUST be owned by that ward's programme service account,
   and each cycle MUST use its own ELEVATE plan solution, because ELEVATE allows one plan per user
@@ -447,11 +448,13 @@ alter one record directly in storage and confirm verification reports it.
 
 - **FR-020**: System MUST evaluate configurable escalation rules (defaults per proposal A11:
   critical overdue ≥ 48 h → IPC officer; ≥ 7 days → district quality manager; returned 2 times →
-  the level above whoever returned it) on an hourly schedule, on each return, and on demand in demo
+  the level above whoever returned it; above the district quality manager is the state
+  administrator) on an hourly schedule, on each return, and on demand in demo
   mode, notify the target role, and never change owner
   or history; supervisors MUST be able to raise a manual escalation with a reason.
 - **FR-021**: Notifications MUST be delivered in-app (stored and shown as unread until opened) and
-  by email through ELEVATE's notification service; an SMS stand-in MUST record consent, template,
+  by email through ELEVATE's notification service (if that path fails pre-flight, SMTP straight to the local mail
+  catcher is used and recorded as a substitution in `docs/elevate-usage.md`); an SMS stand-in MUST record consent, template,
   send time and delivery receipt to demonstrate the scale-up channel.
 
 **Expert support**
@@ -508,7 +511,8 @@ alter one record directly in storage and confirm verification reports it.
   switchable, even if partly translated.
 - **FR-036**: Each role MUST land on a "what needs me now" home showing only actions it may take.
   Field app: frontline staff, ward supervisor, IPC officer, external auditor. Officer web: state
-  administrator, district quality manager, IPC officer, ward supervisor, expert mentor.
+  administrator, district quality manager, IPC officer, ward supervisor, expert mentor, and the
+  external auditor (read-only plans, evidence and history).
 - **FR-037**: The field experience MUST show each queued item as pending, sent or needs attention,
   and report its queue status to the server when online so supervisors see stale devices.
 - **FR-038**: The POC MUST provide a demo clock (visible banner when not real time; usable only by
@@ -608,7 +612,8 @@ alter one record directly in storage and confirm verification reports it.
   by one presenter, against a running ELEVATE, using the demo clock, with no manual data fixes.
 - **SC-002**: 100% of the security test cases (V1, V2, V3, V4 stale + replay, V5b) are refused
   through the POC entry point; the test report also shows each case's result when sent directly
-  to standard ELEVATE (where the local ELEVATE configuration allows it to run).
+  to standard ELEVATE; the only exempt case is V1, whose direct result is cited from the
+  2026-10-23 validation log because ELEVATE file storage is not configured locally.
 - **SC-003**: An assessment with 3 photos made offline for 6 days 23 hours (device time) syncs with zero
   duplicates and zero lost photos in 10 out of 10 repeated runs, including runs with interrupted
   uploads.

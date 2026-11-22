@@ -17,13 +17,15 @@ info:
     * Browser writes: session cookie `ipc_sid` (httpOnly, Secure, SameSite=Strict) **and** `X-CSRF-Token`.
     * Every write (POST/PUT/PATCH/DELETE) carries `Idempotency-Key` (UUID, kept 7 days per user). A replay
       returns the stored response with `Idempotent-Replayed: true`; the same key with a different body is
-      refused with 422 `IDEMPOTENCY_KEY_REUSED`. Auth endpoints (login, OTP) are the only exception.
+      refused with 422 `IDEMPOTENCY_KEY_REUSED`. `login` is the only exception (no user yet).
     * Writes on versioned resources carry `If-Match: "<v>"`. A stale `v` gets 409 `VERSION_CONFLICT`
       whose body carries the current resource (`current`) for the differences view (FR-016).
     * Errors are RFC 9457 `application/problem+json` with a stable `code` and `correlationId`.
     * Scope is always derived on the server; any scope, facility or role claimed in a request body is
-      ignored (FR-028). An id that does not exist or is out of scope returns 403 `SCOPE_DENIED`, so
-      existence is not disclosed, and the attempt is written to the ledger.
+      ignored (FR-028). 403 policy: a resource outside the caller's scope (or an id that does not
+      exist) returns 403 `SCOPE_DENIED`, so existence is not disclosed; a resource in scope where the
+      caller is not the owner or assignee the operation requires returns 403 `NOT_OWNER`. Both are
+      written to the ledger.
     * Free text is at most 500 characters. Lists are cursor-paginated (`limit` 1-100, default 25).
     * No patient data field exists anywhere in this contract (FR-032).
 
@@ -84,8 +86,8 @@ paths:
       summary: Sign in with ELEVATE identifier and password
       description: |
         Calls ELEVATE user-service login, stores ELEVATE tokens encrypted server-side and sets the
-        `ipc_sid` cookie. If ELEVATE requires OTP for the account (admin roles), returns 202 with an
-        OTP challenge instead. Exempt from Idempotency-Key and CSRF (no session yet).
+        `ipc_sid` cookie. Password login only in the POC (OTP is a pilot upgrade). Exempt from
+        Idempotency-Key and CSRF (no session yet).
       security: []
       x-roles: [PUBLIC]
       x-requirements: [FR-033, FR-034, US9]
@@ -94,58 +96,6 @@ paths:
         content:
           application/json:
             schema: {$ref: '#/components/schemas/LoginRequest'}
-      responses:
-        '200':
-          description: Signed in; session cookie set.
-          headers:
-            Set-Cookie: {$ref: '#/components/headers/SetSessionCookie'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Session'}
-        '202':
-          description: OTP required to complete sign-in.
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/OtpChallenge'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '429': {$ref: '#/components/responses/TooManyRequests'}
-        '503': {$ref: '#/components/responses/ServiceUnavailable'}
-  /ipc/v1/auth/otp:
-    post:
-      tags: [auth]
-      operationId: requestOtp
-      summary: Request an OTP through ELEVATE
-      security: []
-      x-roles: [PUBLIC]
-      x-requirements: [FR-033, US9]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/OtpRequest'}
-      responses:
-        '202':
-          description: OTP sent if the identifier is known (response does not disclose which).
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/OtpChallenge'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '429': {$ref: '#/components/responses/TooManyRequests'}
-        '503': {$ref: '#/components/responses/ServiceUnavailable'}
-  /ipc/v1/auth/otp/verification:
-    post:
-      tags: [auth]
-      operationId: verifyOtp
-      summary: Verify an OTP and start the session
-      security: []
-      x-roles: [PUBLIC]
-      x-requirements: [FR-033, US9]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: '#/components/schemas/OtpVerifyRequest'}
       responses:
         '200':
           description: Signed in; session cookie set.
@@ -173,8 +123,11 @@ paths:
       responses:
         '204':
           description: Session ended; cookie cleared.
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/me:
     get:
@@ -233,6 +186,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/users:
@@ -476,6 +430,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -556,6 +511,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/admin/scope-assignments/{assignmentId}:
@@ -914,8 +870,8 @@ paths:
     put:
       tags: [demo]
       operationId: setDemoClock
-      summary: Shift programme time (demo mode, dev/uat profile only)
-      description: ELEVATE dates are never shifted. Ledger `clock.shifted`. Outside demo mode returns 403 `DEMO_MODE_DISABLED`.
+      summary: Shift programme time (demo mode only)
+      description: Allowed only when DEMO_MODE=true and the profile is dev, test or uat; otherwise 403 `DEMO_MODE_DISABLED`. ELEVATE dates are never shifted. Ledger `clock.shifted`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -963,8 +919,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DemoClock'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/demo/escalation-sweep:
     post:
@@ -985,8 +944,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SweepResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
 
@@ -1027,6 +989,50 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
+    post:
+      tags: [assessments]
+      operationId: startAssessment
+      summary: Start an assessment of a ward for a cycle and get its offline form bundle
+      description: |
+        Called by the field app while online, when downloading a ward for offline use. Creates the
+        ELEVATE samiksha observation for the ward (`data.entities` = the ward's ELEVATE entity) on the
+        cycle's observation solution and the programme AssessmentContext (status `draft`), and returns
+        the `assessmentId` with the form bundle (checklist version and content hash). Repeating the
+        call for the same caller, ward and cycle while a draft is open returns that draft (200). Ward
+        outside scope → 403 `SCOPE_DENIED`; caller not assigned to assess the ward → 403 `NOT_OWNER`.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      x-roles: [IPC_OFFICER, EXTERNAL_AUDITOR]
+      x-requirements: [FR-007, FR-010, US2]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssessmentStartRequest'}
+      responses:
+        '200':
+          description: An open draft already exists; returned with its bundle.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentStartResponse'}
+        '201':
+          description: Assessment started.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+            Location: {$ref: '#/components/headers/Location'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentStartResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /ipc/v1/assessments/{assessmentId}:
     parameters:
       - $ref: '#/components/parameters/AssessmentId'
@@ -1080,7 +1086,8 @@ paths:
         Answers reference confirmed evidence ids only (photos sync first). The Edge checks scope and
         ownership and writes to samiksha with the caller's ELEVATE token. Without `declaration.accepted`
         → 422 `DECLARATION_REQUIRED`. Draft built on a version retired past its grace period → 422
-        `CHECKLIST_VERSION_RETIRED` (restart on the new version). Scope changed since download → 403 `SCOPE_DENIED`.
+        `CHECKLIST_VERSION_RETIRED` (restart on the new version). Scope changed since download → 403 `SCOPE_DENIED`;
+        ward in scope but the caller is not the assessment's assessor → 403 `NOT_OWNER`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1179,6 +1186,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/assessments/{assessmentId}/comparison:
     parameters:
@@ -1245,6 +1253,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -1255,6 +1264,7 @@ paths:
       tags: [evidence]
       operationId: renewEvidenceUploadUrl
       summary: Issue a fresh signed upload URL when the previous one expired mid-upload
+      description: Only the uploader may renew (else 403 `NOT_OWNER`); a confirmed item returns 409 `INVALID_TRANSITION`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1268,9 +1278,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SignedUrl'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /ipc/v1/evidence/{evidenceId}/confirmation:
@@ -1280,6 +1292,7 @@ paths:
       tags: [evidence]
       operationId: confirmEvidence
       summary: Confirm upload; server re-checks size, type and SHA-256
+      description: Only the uploader may confirm (else 403 `NOT_OWNER`). A hash mismatch returns 422 `EVIDENCE_HASH_MISMATCH`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1293,6 +1306,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/EvidenceItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -1627,7 +1641,7 @@ paths:
       tags: [tasks]
       operationId: startTask
       summary: ASSIGNED to IN_PROGRESS (owner; all dependencies closed)
-      description: An open dependency returns 409 `DEPENDENCY_OPEN` naming the blocking task(s) in `blockingTasks`.
+      description: Caller must be the task owner (else 403 `NOT_OWNER`). An open dependency returns 409 `DEPENDENCY_OPEN` naming the blocking task(s) in `blockingTasks`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -1638,9 +1652,11 @@ paths:
         - $ref: '#/components/parameters/IfMatch'
       responses:
         '200': {$ref: '#/components/responses/TaskOk'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
   /ipc/v1/tasks/{taskId}/evidence-submission:
     parameters:
@@ -1649,7 +1665,7 @@ paths:
       tags: [tasks]
       operationId: submitTaskEvidence
       summary: Submit evidence (IN_PROGRESS or CHANGES_REQUESTED to EVIDENCE_SUBMITTED; owner)
-      description: Evidence must be confirmed and meet the task's evidence rule, else 422 `EVIDENCE_RULE_NOT_MET`. Emits `ipc.task.evidence_submitted`.
+      description: Caller must be the task owner (else 403 `NOT_OWNER`). Evidence must be confirmed and meet the task's evidence rule, else 422 `EVIDENCE_RULE_NOT_MET`. Emits `ipc.task.evidence_submitted`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2018,6 +2034,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -2093,6 +2110,7 @@ paths:
       tags: [support]
       operationId: recordSupportOutcome
       summary: Mentor marks the session held and records agreed actions (request must be accepted in ELEVATE)
+      description: Only the chosen mentor of the request may record the outcome (else 403 `NOT_OWNER`); a request not yet accepted returns 409 `INVALID_TRANSITION`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2277,6 +2295,7 @@ paths:
       tags: [notifications]
       operationId: markNotificationRead
       summary: Mark an in-app notification as read
+      description: Only the recipient may mark it read (else 403 `NOT_OWNER`).
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2290,8 +2309,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Notification'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
 
   # ---------------------------------------------------------------- devices
@@ -2326,6 +2348,7 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
 
@@ -2496,7 +2519,10 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SweepResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /internal/escalations/run-now:
@@ -2516,8 +2542,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/SweepResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /internal/reconciliation/run:
     post:
@@ -2549,6 +2578,132 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ReconciliationResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/ledger/records:
+    post:
+      tags: [internal]
+      operationId: internalAppendLedger
+      summary: Append a ledger record on behalf of the Edge
+      description: |
+        Used by the Edge for events it decides itself: access denials (`evidence.denied`,
+        `scope.denied`, `owner.denied`), evidence actions (`evidence.confirmed`,
+        `evidence.patient_data_deleted`) and refused checklist-edit attempts. Workflow assigns `seq`,
+        `at`, `programmeAt`, `prevHash` and `hash` in the same transaction as the append.
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-031, FR-032, US9]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LedgerAppendRequest'}
+      responses:
+        '201':
+          description: Record appended.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LedgerRecord'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/assessments/{elevateSubmissionId}/context:
+    parameters:
+      - name: elevateSubmissionId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/ElevateRef'}
+    put:
+      tags: [internal]
+      operationId: internalUpsertAssessmentContext
+      summary: Create or update the programme AssessmentContext for an ELEVATE submission
+      description: |
+        Called by the Edge after it writes a submission to samiksha (start, submit). Keyed on
+        `elevateSubmissionId` (unique). Server-derived fields (`isBaselineForCycle`, `baselineOfId`,
+        `releaseState`, `scores`, `failedQuestionKeys`) are set by workflow, not by the caller. Status
+        only moves forward (draft → submitted → completed); a regression returns 409 `INVALID_TRANSITION`.
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-010, FR-032, US2]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssessmentContextUpsert'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssessmentContext'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /internal/evidence/data-quality:
+    servers:
+      - url: http://edge:8081
+        description: Edge private listener (private network only; not exposed on the public :443 entry point).
+    get:
+      tags: [internal]
+      operationId: edgeInternalEvidenceDQ
+      summary: Evidence-based data-quality exceptions (served by the Edge, which owns evidence)
+      description: |
+        **Served by the Edge** on its private listener, not by workflow; workflow merges these with its
+        own exceptions (no baseline, stale device queue) for `listDataQualityExceptions`. Returns the
+        evidence-based kinds: `PHOTO_NO_GPS`, `GPS_FAR_FROM_FACILITY` (> 1 km from the facility point),
+        `DEVICE_CLOCK_SKEW` (> 10 min), `LATE_UPLOAD` (capture to upload > 7 days) and
+        `DUPLICATE_PHOTO_ACROSS_WARDS` (same SHA-256 in two wards).
+      security:
+        - serviceJwt: []
+      x-roles: [SERVICE]
+      x-requirements: [FR-026, US8]
+      parameters:
+        - name: kind
+          in: query
+          schema:
+            type: string
+            enum: [PHOTO_NO_GPS, GPS_FAR_FROM_FACILITY, DEVICE_CLOCK_SKEW, LATE_UPLOAD, DUPLICATE_PHOTO_ACROSS_WARDS]
+        - {name: facilityId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: wardId, in: query, schema: {$ref: '#/components/schemas/ObjectId'}}
+        - {name: since, in: query, schema: {type: string, format: date-time}}
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Exceptions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Page'
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/DataQualityException'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /internal/healthz:
@@ -2738,14 +2893,14 @@ components:
         application/problem+json:
           schema: {$ref: '#/components/schemas/Problem'}
     Unauthorized:
-      description: No valid session, service token or scheduler secret (`UNAUTHENTICATED`, `SESSION_EXPIRED`, `OTP_INVALID`).
+      description: No valid session, service token or scheduler secret (`UNAUTHENTICATED`, `SESSION_EXPIRED`).
       headers:
         X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
       content:
         application/problem+json:
           schema: {$ref: '#/components/schemas/Problem'}
     Forbidden:
-      description: Role, scope, ownership, CSRF or demo-mode refusal (`ROLE_DENIED`, `SCOPE_DENIED`, `NOT_OWNER`, `CSRF_INVALID`, `DEMO_MODE_DISABLED`). Recorded in the ledger.
+      description: Role, scope, ownership, CSRF or demo-mode refusal. `SCOPE_DENIED` = resource outside the caller's scope (or unknown id); `NOT_OWNER` = in scope but the caller is not the required owner or assignee; also `ROLE_DENIED`, `CSRF_INVALID`, `DEMO_MODE_DISABLED`. Recorded in the ledger.
       headers:
         X-Correlation-Id: {$ref: '#/components/headers/CorrelationId'}
       content:
@@ -2914,7 +3069,6 @@ components:
       enum:
         - UNAUTHENTICATED
         - SESSION_EXPIRED
-        - OTP_INVALID
         - CSRF_INVALID
         - ROLE_DENIED
         - SCOPE_DENIED
@@ -3000,29 +3154,6 @@ components:
         password: {type: string, maxLength: 256, writeOnly: true}
         client: {type: string, enum: [web, field]}
         deviceId: {type: string, format: uuid}
-    OtpRequest:
-      type: object
-      required: [identifier]
-      additionalProperties: false
-      properties:
-        identifier: {type: string, maxLength: 254}
-    OtpVerifyRequest:
-      type: object
-      required: [identifier, otp, client]
-      additionalProperties: false
-      properties:
-        identifier: {type: string, maxLength: 254}
-        otp: {type: string, pattern: '^[0-9]{4,8}$', writeOnly: true}
-        challengeId: {type: string, maxLength: 64}
-        client: {type: string, enum: [web, field]}
-        deviceId: {type: string, format: uuid}
-    OtpChallenge:
-      type: object
-      required: [otpRequired]
-      properties:
-        otpRequired: {type: boolean, const: true}
-        challengeId: {type: string, maxLength: 64}
-        expiresAt: {$ref: '#/components/schemas/Timestamp'}
     Session:
       type: object
       required: [user, csrfToken, expiresAt]
@@ -3651,6 +3782,45 @@ components:
       properties:
         baselineOfId: {$ref: '#/components/schemas/ObjectId'}
         reason: {$ref: '#/components/schemas/FreeText'}
+    AssessmentStartRequest:
+      type: object
+      required: [wardId, cycleId]
+      additionalProperties: false
+      properties:
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+    AssessmentStartResponse:
+      type: object
+      required: [assessmentId, assessment, formBundle]
+      properties:
+        assessmentId: {$ref: '#/components/schemas/ObjectId'}
+        assessment: {$ref: '#/components/schemas/AssessmentContext'}
+        formBundle: {$ref: '#/components/schemas/FormBundle'}
+    AssessmentContextUpsert:
+      type: object
+      required: [elevateObservationId, wardId, facilityId, cycleId, checklistVersionId, assessorUserId, assessorType, status]
+      additionalProperties: false
+      properties:
+        elevateObservationId: {$ref: '#/components/schemas/ElevateRef'}
+        submissionNumber: {type: integer, minimum: 1}
+        wardId: {$ref: '#/components/schemas/ObjectId'}
+        facilityId: {$ref: '#/components/schemas/ObjectId'}
+        cycleId: {$ref: '#/components/schemas/ObjectId'}
+        checklistVersionId: {$ref: '#/components/schemas/ObjectId'}
+        assessorUserId: {$ref: '#/components/schemas/UserId'}
+        assessorType: {type: string, enum: [internal, external]}
+        declaration:
+          type: object
+          required: [accepted, at]
+          additionalProperties: false
+          properties:
+            accepted: {type: boolean, const: true}
+            at: {$ref: '#/components/schemas/Timestamp'}
+        status: {$ref: '#/components/schemas/AssessmentStatus'}
+        evidenceIds:
+          type: array
+          items: {$ref: '#/components/schemas/ObjectId'}
+        bundleHash: {$ref: '#/components/schemas/Sha256'}
     Comparison:
       type: object
       required: [assessmentId, baselineAssessmentId, wardId, facilityId, current, baseline, sections, notComparable]
@@ -4417,6 +4587,24 @@ components:
         correlationId: {type: string, maxLength: 64}
         prevHash: {$ref: '#/components/schemas/Sha256'}
         hash: {$ref: '#/components/schemas/Sha256'}
+    LedgerAppendRequest:
+      type: object
+      required: [actor, action, subject, correlationId]
+      additionalProperties: false
+      properties:
+        actor: {$ref: '#/components/schemas/Actor'}
+        action: {type: string, pattern: '^[a-z_]+\.[a-z_]+$', maxLength: 64, examples: [evidence.denied, scope.denied, checklist.edit_refused]}
+        subject:
+          type: object
+          required: [type, id]
+          additionalProperties: false
+          properties:
+            type: {$ref: '#/components/schemas/LedgerSubjectType'}
+            id: {type: string, maxLength: 64}
+        reason: {$ref: '#/components/schemas/FreeText'}
+        beforeHash: {$ref: '#/components/schemas/Sha256'}
+        afterHash: {$ref: '#/components/schemas/Sha256'}
+        correlationId: {type: string, minLength: 1, maxLength: 64}
     LedgerVerification:
       type: object
       required: [ok, checkedRecords, verifiedAt]

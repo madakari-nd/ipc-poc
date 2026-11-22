@@ -42,7 +42,8 @@ ELEVATE request/response shapes, verification status and fallbacks: [research.md
   k6, Trivy, npm audit, gitleaks, GitHub Actions.
 
 **Storage**: MongoDB 7 (single-node replica set for transactions; one database per profile); MinIO
-(S3 API, versioning + object lock, one bucket per profile). ELEVATE's own stores stay untouched.
+(S3 API, versioning; object lock is not applied to the evidence prefix so patient-data media can be
+purged; one bucket per profile). ELEVATE's own stores stay untouched.
 
 **Testing**: Vitest unit (business rules) → contract tests (ajv validates every response against
 OpenAPI / JSON Schema) → integration against real ELEVATE (`test` profile) → Playwright E2E for 8
@@ -63,7 +64,7 @@ mid-range mobile profile).
 a static secret header; the demo clock never shifts ELEVATE dates.
 
 **Scale/Scope**: pilot 15 hospitals / ~150 wards / 250 users / 7 roles; scale 150 / ~1,500 / 2,500
-(see Capacity). 9 user stories, ~30 screens, 91 API operations (84 public, 7 internal; see contracts/README.md).
+(see Capacity). 9 user stories, ~30 screens, 93 API operations (83 public, 10 internal; see contracts/README.md).
 
 ## Constitution Check
 
@@ -80,8 +81,8 @@ a static secret header; the demo clock never shifts ELEVATE dates.
 | VII | Offline-first field app | Dexie + AES-GCM (key derived at sign-in); ordered outbox files→records→decisions; GPS/time + SHA-256 on device; 409 → differences view | PASS |
 | VIII | UI/UX | role homes; `<StateBoundary>` for loading/empty/error/offline/denied; WCAG 2.2 AA via axe in E2E; i18n en/hi/kn; bundle budget in CI; confirm-with-reason dialogs | PASS |
 | IX | Design system | `packages/design-system`: tokens → Tailwind preset → Radix components; living style page at `/style`; semantic tokens for task state, risk, legend | PASS |
-| X | System design | Trust boundaries as compose networks (`public`, `private`, `elevate` external); async where ELEVATE emits events; circuit breakers; capacity table below; metrics list in research.md §5 | PASS |
-| XI | Test-first | business rules test-first; layers as above; 80% coverage gate on `services/*/src/domain`; journey "done" = E2E green + demo step | PASS |
+| X | System design | Trust boundaries as compose networks (`public`, `private`, `stack_samiksha_net` external); async where ELEVATE emits events; circuit breakers; capacity table below; metrics list in research.md §5 | PASS |
+| XI | Test-first | business rules test-first; layers as above; 80% coverage gate on workflow domain and edge scope/middleware/evidence/session modules; journey "done" = E2E green + demo step | PASS |
 | XII | Simplicity | no Keycloak/Camunda/Temporal/OPA/K8s; `docker compose up` + `npm run seed`; AI out | PASS |
 | XIII | Almost production grade | 4 profiles; backup sidecar + restore drill; Prometheus/Grafana/Alertmanager; health/ready/dependencies; graceful drain; migrate-mongo migrations; versioned images + `scripts/rollback.sh`; CI gates; helmet + CSP; ASVS L2 checklist | PASS (see Complexity Tracking: observability stack) |
 
@@ -110,9 +111,13 @@ a static secret header; the demo clock never shifts ELEVATE dates.
  scheduler (→ POST /internal/escalations/sweep, secret header) · notification (email → Mailpit)
 ```
 
+**Listeners**: the edge has a public listener (:8080, reached only through Caddy) and a private
+listener (:8081, `private` network only) that serves `edgeInternalEvidenceDQ` to workflow.
+Workflow listens only on the private network.
+
 **Key flows**:
 1. **Assessment**: field app → `POST /ipc/v1/evidence/intents` → PUT to signed URL → `POST
-   /ipc/v1/evidence/{id}/confirm` → `POST /ipc/v1/assessments/{id}/submission` (answers carry
+   /ipc/v1/evidence/{id}/confirmation` → `POST /ipc/v1/assessments/{id}/submission` (answers carry
    evidence ids). Edge checks scope + ownership, calls samiksha `observationSubmissions/update`
    with the officer's ELEVATE token.
 2. **Completion → draft plan**: samiksha publishes `elevate_observations_<env>` (status completed)

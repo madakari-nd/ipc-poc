@@ -17,7 +17,8 @@ fields are max 500 characters.
 | Scope assignments, catalogue, rules, governance, ledger, clock | workflow | edge reads scope via internal API (cached 60 s) |
 | Evidence objects + metadata | edge (evidence locker) | workflow references evidenceIds |
 | Idempotency records, sessions, rate-limit counters | edge (database `edge_<profile>`) | — |
-| Notifications (SMS stand-in), analytics outbox | adapters | workflow emits events |
+| In-app and email notifications (`notifications` collection) | workflow | — |
+| SMS stand-in records (`sms_messages`: consent, receipts), analytics outbox | adapters | workflow emits events |
 
 ## 1. Reference & access (workflow)
 
@@ -176,6 +177,10 @@ field app device session up to 7 days with refresh).
 JSON of the record without `hash`). Mongo role for the app: insert + find only.
 `ledger:verify` recomputes the chain and reports the first broken `seq`.
 
+### RetentionPolicy (workflow; single document per profile)
+`evidenceYearsAfterPlanClosure` (3), `auditYears` (7), `otherYearsAfterProgrammeEnd` (5),
+`purgeMode` (dry_run | enforce; POC = dry_run), `updatedBy`, `updatedAt` (NFR-010).
+
 ## 9. Events & outbox (workflow, adapters)
 
 ### OutboxEvent
@@ -190,7 +195,7 @@ error, attempts, firstFailedAt}, replayable by `npm run dlq:replay`.
 
 ### ClockSetting (single document per profile)
 `offsetMs` (0 in real time), `setBy`, `setAt`. Allowed only when `DEMO_MODE=true` and profile ∈
-{dev, uat}; every change → ledger `clock.shifted`. All due/overdue/offline/cycle calculations
+{dev, test, uat}; every change → ledger `clock.shifted`. All due/overdue/offline/cycle calculations
 use `programmeNow() = Date.now() + offsetMs`; ELEVATE dates are never shifted.
 
 ## Indexes (main)

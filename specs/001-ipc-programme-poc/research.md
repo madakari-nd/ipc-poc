@@ -19,7 +19,7 @@ Everything is re-proven by `npm run preflight` (§3) before any demo.
 | T6 | cockatiel policies on every ELEVATE call: timeout 5 s, 3 retries with jitter on idempotent calls, circuit breaker 50%/30 s | ELEVATE hangs on unknown routes (V2 A10). Failures stay isolated (NFR-009). | Bare fetch (hangs, cascades). |
 | T7 | Evidence in the programme MinIO; ELEVATE stores only an opaque evidenceId inside the answer or task | ELEVATE file sign/download is broken locally and has access flaws (V1, research-elevate R6). The locker enforces scope. | ELEVATE cloud-services upload (broken; V1 flaw). |
 | T8 | Rate limiting with express-rate-limit and a Mongo store (120/min per user, 20/min per IP on login) | No new product (Constitution XII). Works across restarts. | Redis store (one more dependency per profile). |
-| T9 | Prometheus + Grafana + Alertmanager. prom-client in each service; W3C traceparent is propagated and its trace id is logged as the correlationId. | NFR-003: one dashboard and 5 alerts. | Full OTel collector + Tempo (more than the POC needs). |
+| T9 | Prometheus + Grafana + Alertmanager. prom-client in each service; W3C traceparent is propagated and its trace id is logged as the correlationId. | NFR-003: one dashboard and the 6 alerts in §5. | Full OTel collector + Tempo (more than the POC needs). |
 | T10 | Caddy terminates TLS with local CA certificates | NFR-005, with almost no configuration. | nginx + mkcert (more manual). |
 | T11 | Backup sidecar: `mongodump --oplog` every 15 min and `mc mirror` for MinIO, keeping 7 days of copies | RPO ≤ 15 min (NFR-002). The restore drill script restores into a scratch DB and runs `ledger:verify`. | Volume snapshots (not portable). |
 | T12 | migrate-mongo for versioned, reversible migrations, including indexes and the ledger DB role (insert + find only) | NFR-006. The DB role makes "append-only" true at the database. | Index creation at boot (not reversible). |
@@ -84,7 +84,7 @@ Each case runs twice, through the Edge (must be refused) and directly against EL
 | V3: a targeting body that claims another org | Overridden, so 0 cross-org results | 4 solutions |
 | V4: a stale sync | 409 | 200 |
 | V4: a replay of the same key | The original stored response | Accepted |
-| V5b: Hospital B writes to Hospital A's submission | 403 `NOT_OWNER` | 200 |
+| V5b: Hospital B writes to Hospital A's submission | 403 `SCOPE_DENIED` (out of scope) | 200 |
 
 ## 5. Observability
 

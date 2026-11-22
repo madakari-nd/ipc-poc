@@ -3,7 +3,8 @@ Sync Impact Report
 - Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 (MINOR: added Principle XIII
   Almost Production Grade, per user directive). 1.0.1 was PATCH: data-pipeline removed from Principle I
   list — POC oversight uses officer-web screens; scheduler callback auth = static shared secret)
-- Principles: I–XII defined; XIII added in 1.1.0
+- Principles: I–XII defined; XIII added in 1.1.0; VI readiness wording clarified in 1.1.1
+  (PATCH: readiness excludes ELEVATE; ELEVATE status via /dependencies — aligns with NFR-004)
 - Added sections: Technology & Platform Constraints; Development Workflow & Quality Gates; Governance
 - Removed sections: none
 - Templates: plan-template "Constitution Check" reads this file at runtime — no edits needed
@@ -105,8 +106,9 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
   (replica set) or an outbox pattern; partial writes are not acceptable.
 - Configuration follows 12-factor: environment variables, validated at startup; the service
   refuses to start on missing or invalid config.
-- Structured JSON logging with correlation id across Edge → services → ELEVATE; health
-  (`/healthz`) and readiness (`/readyz`, includes ELEVATE reachability) on every service.
+- Structured JSON logging with correlation id across Edge → services → ELEVATE; health (`/healthz`),
+  readiness (`/readyz`, own stores and broker only) and `/dependencies` (ELEVATE reachability,
+  for display and alerts) on every service.
 
 ### VII. Offline-First Field App
 
@@ -235,4 +237,4 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - Compliance: every `/speckit-plan` runs the Constitution Check; every review verifies the
   NON-NEGOTIABLE principles (I, III) explicitly.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-22
+**Version**: 1.1.1 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-22
