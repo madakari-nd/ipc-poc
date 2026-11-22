@@ -1,7 +1,9 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0
-- Principles: all newly defined (I–XII)
+- Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 (MINOR: added Principle XIII
+  Almost Production Grade, per user directive). 1.0.1 was PATCH: data-pipeline removed from Principle I
+  list — POC oversight uses officer-web screens; scheduler callback auth = static shared secret)
+- Principles: I–XII defined; XIII added in 1.1.0
 - Added sections: Technology & Platform Constraints; Development Workflow & Quality Gates; Governance
 - Removed sections: none
 - Templates: plan-template "Constitution Check" reads this file at runtime — no edits needed
@@ -21,7 +23,7 @@ proposal and its validation findings (V1–V6) are the source of truth for scope
 ### I. Reuse ELEVATE, Never Fork (NON-NEGOTIABLE)
 
 - ELEVATE services (user, entity-management, samiksha, project, mentoring, scheduler,
-  notification, interface-service, data-pipeline) MUST be used through their existing APIs and
+  notification, interface-service) MUST be used through their existing APIs and
   events. No ELEVATE source file, schema or migration is changed by this project.
 - The POC MUST run against a real ELEVATE deployment (the local ELEVATE stack). ELEVATE APIs MUST
   NOT be mocked or simulated in demos, integration tests or end-to-end tests. Unit tests may stub
@@ -154,7 +156,8 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
   external systems (adapters only, signed calls). Network exposure is declared in compose files.
 - Asynchronous where ELEVATE already emits events (observation completion, project sync),
   synchronous where the user waits; escalation sweeps run from ELEVATE scheduler calling a
-  private, signed Workflow endpoint.
+  private Workflow endpoint protected by a shared secret header (the scheduler can only send a
+  fixed header) and network isolation.
 - Failure isolation: an ELEVATE outage degrades the affected journey with a clear message and
   queued retry; it never corrupts programme state.
 - Designed for 15 hospitals in the pilot and 150 at scale with the same ownership and boundaries;
@@ -171,6 +174,20 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - Coverage ≥ 80% lines on Workflow Service and Edge business modules.
 - A journey is "done" only when its end-to-end test passes against real ELEVATE and its demo step
   is written in `docs/demo-script.md`.
+
+### XIII. Almost Production Grade
+
+- The POC is built and operated as the pilot's first release, not a throwaway demo: separate
+  environment profiles (dev, test, demo, prod-like), automated backups with a tested restore,
+  metrics + dashboards + alerts, liveness/readiness, graceful shutdown, versioned reversible
+  migrations, image-based versioned releases with rollback, and a runbook.
+- CI pipeline on every change: lint, type-check, unit, contract, integration against ELEVATE,
+  E2E, accessibility, dependency/image vulnerability scan, secret scan. Merge is blocked on red.
+- Security baseline: TLS at the Edge, Helmet-style secure headers and strict CSP, OWASP ASVS L2
+  for auth, access control, input validation and logging; no critical vulnerabilities shipped.
+- "Simple" (Principle XII) means fewer moving parts, never lower quality: production qualities
+  are achieved with the MERN stack plus the existing ELEVATE infrastructure, without new products
+  beyond observability tooling justified in plan.md.
 
 ### XII. Simplicity and POC Discipline
 
@@ -218,4 +235,4 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - Compliance: every `/speckit-plan` runs the Constitution Check; every review verifies the
   NON-NEGOTIABLE principles (I, III) explicitly.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-22
+**Version**: 1.1.0 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-22
