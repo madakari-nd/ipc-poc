@@ -10,3 +10,6 @@ specs/
 docs/source/
 .specify/
 .claude/
+infra/
+scripts/
+.github/

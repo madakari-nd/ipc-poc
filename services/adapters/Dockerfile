@@ -2,12 +2,12 @@
 # Multi-stage build for @ipc/adapters (NFR-006). Non-root, minimal runtime, healthcheck.
 FROM node:22.11.0-bookworm-slim AS build
 WORKDIR /repo
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages ./packages
-COPY services/adapters ./services/adapters
-RUN npm ci --workspaces --include-workspace-root=false -w @ipc/adapters -w @ipc/platform -w @ipc/contracts -w @ipc/elevate-client \
+ENV HUSKY=0
+COPY . .
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund \
  && npm run build -w @ipc/contracts -w @ipc/platform -w @ipc/elevate-client -w @ipc/adapters \
- && npm prune --omit=dev
+ && npm prune --omit=dev --no-audit --no-fund \
+ && rm -rf apps packages/design-system tests specs docs
 
 FROM node:22.11.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
