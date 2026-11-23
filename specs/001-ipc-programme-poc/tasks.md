@@ -161,7 +161,7 @@ its own once Phase 2 is done.
 
 ### Seed, reset, operations base
 
-- [ ] T054 Write `scripts/seed.ts`, which uses the adapters and ELEVATE clients to create the FR-039 demo state in the chosen profile:
+- [X] T054 Write `scripts/seed.ts`, which uses the adapters and ELEVATE clients to create the FR-039 demo state in the chosen profile:
   - 2 districts, Hospitals A and B, 3 wards each including Ward 4
   - users per role and 3 mentors
   - checklist v1 with ward-type sections and risk levels, and the plan template
@@ -169,7 +169,7 @@ its own once Phase 2 is done.
   - ward service accounts and one plan solution per cycle
   - back-dated baseline data for US7 and US8
   - the no-GPS and clock-skew photos for data-quality checks
-- [ ] T055 Write `scripts/reset.ts`. It wipes the programme DB and bucket for the profile, deactivates the profile's ELEVATE users and entities by code prefix, and re-seeds. Target: under 2 minutes (SC-009)
+- [X] T055 Write `scripts/reset.ts`. It wipes the programme DB and bucket for the profile, deactivates the profile's ELEVATE users and entities by code prefix, and re-seeds. Target: under 2 minutes (SC-009)
 - [X] T056 [P] Write `infra/prometheus/prometheus.yml` and `alerts.yml` with the 6 alerts from research.md §5, plus `infra/grafana/dashboards/ipc-ops.json`
 - [X] T057 [P] Write the backup sidecar in `infra/backup/{Dockerfile,backup.sh}`: `mongodump --oplog` every 15 minutes and `mc mirror` of the bucket, keeping 7 days (NFR-002). It applies the evidence purge list to every mirror copy, so deleted patient-data media is gone from backups too (FR-032)
 

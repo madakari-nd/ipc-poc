@@ -154,7 +154,9 @@ async function main() {
     use({ capability: 'Create user one by one (b2)', endpoint: 'POST /user/v1/account/create', mode: 'AS-IS', result: 'PASS', fallback: 'bulk CSV blocked (no storage) → per-record path' });
     const roles = await c.user.listRoles(created.access_token);
     use({ capability: 'Role list', endpoint: 'GET /user/v1/user-role/list', mode: 'AS-IS', result: `PASS (${roles.length} roles)`, fallback: '–' });
-    const adminToken = await loginOptional('ELEVATE_ADMIN_EMAIL', 'ELEVATE_ADMIN_PASSWORD');
+    // Lab admin logs in on /admin/login (an account/login token is refused by assignRole).
+    const adminToken = env.ELEVATE_ADMIN_EMAIL && env.ELEVATE_ADMIN_PASSWORD
+      ? (await c.user.adminLogin(env.ELEVATE_ADMIN_EMAIL, env.ELEVATE_ADMIN_PASSWORD)).access_token : undefined;
     if (!adminToken) {
       use({ capability: 'Assign role (b3)', endpoint: 'POST /user/v1/admin/assignRole', mode: 'AS-IS', result: 'PENDING-SEED (no admin account)', fallback: 'mentors via role request (E3)' });
       use({ capability: 'Deactivate user (b5)', endpoint: 'POST /user/v1/org-admin/deactivateUser', mode: 'AS-IS', result: 'PENDING-SEED (no org-admin account)', fallback: 'programme-side scope end' });
@@ -162,14 +164,17 @@ async function main() {
     }
     const role = roles.find((r) => r.title === 'user') ?? roles.find((r) => r.title === 'mentee');
     if (!role) throw new Error('no assignable role found');
-    await c.user.assignRole(adminToken, { user_id: created.user.id, role_id: role.id });
+    // assignRole ends the user's sessions and the check then deactivates it, so a separate user
+    // takes those steps; the first user's token stays valid for checks 5 and 8.
+    const roleUser = (await c.user.createAccount({ name: 'PF Preflight Role User', email: `${PF.toLowerCase()}role-${TS}@example.org`, password: password || `Pf@${TS}` })).user;
+    await c.user.assignRole(adminToken, { user_id: roleUser.id, role_id: role.id });
     use({ capability: 'Assign role (b3)', endpoint: 'POST /user/v1/admin/assignRole', mode: 'AS-IS', result: 'PASS', fallback: '–' });
     const orgAdmin = await loginOptional('ELEVATE_ORG_ADMIN_EMAIL', 'ELEVATE_ORG_ADMIN_PASSWORD');
     if (orgAdmin) {
-      await c.user.deactivateUsers(orgAdmin, { ids: [created.user.id] });
+      await c.user.deactivateUsers(orgAdmin, { ids: [roleUser.id] });
       use({ capability: 'Deactivate user (b5)', endpoint: 'POST /user/v1/org-admin/deactivateUser', mode: 'AS-IS', result: 'PASS', fallback: '–' });
     }
-    return { verdict: 'PASS', detail: `user ${created.user.id} created, role ${role.title} assigned${orgAdmin ? ', deactivated' : ''}` };
+    return { verdict: 'PASS', detail: `users ${created.user.id}/${roleUser.id} created, role ${role.title} assigned to ${roleUser.id}${orgAdmin ? ', deactivated' : ''}` };
   });
 
   // 3 ── Entities + mapping ---------------------------------------------------------------------
@@ -336,7 +341,9 @@ async function main() {
     const mentorId = env.ELEVATE_PF_MENTOR_ID;
     if (!requester || !S.officerToken) throw new Error('no user token');
     if (!mentorId) return { verdict: 'PENDING-SEED', detail: 'ELEVATE_PF_MENTOR_ID not set (seed a mentor)' };
-    const start = Math.floor(Date.now() / 1000) + 3 * 86400;
+    // A different 1-hour slot per run (3–23 days ahead): the mentor accepts each request, and
+    // mentoring refuses a second accepted session at the same time.
+    const start = Math.floor(Date.now() / 1000) + 3 * 86400 + (Math.floor(TS / 1000) % 480) * 3600;
     const avail = await c.mentoring.isAvailable(S.officerToken, mentorId, start, start + 3600);
     use({ capability: 'Mentor availability (g4)', endpoint: 'GET /mentoring/v1/availability/isAvailable/:mentorId', mode: 'AS-IS', result: `PASS (is_available=${avail})`, fallback: '"has open slot" = programme rule' });
     let mentorsList = 'PASS (200)';
@@ -346,6 +353,9 @@ async function main() {
       mentorsList = e instanceof ElevateError ? `BROKEN (${e.status})` : `BROKEN (${msg(e)})`;
     }
     use({ capability: 'Mentor search (g3)', endpoint: 'GET /mentoring/v1/mentors/list', mode: 'AS-IS', result: mentorsList, fallback: 'rank from Workflow mentor register (E10)' });
+    // Mentoring creates no profile for new users on this stack; accept needs the requester's (mentee) profile.
+    const who = decodeToken(requester).data;
+    await c.mentoring.addUserExtension({ id: Number(who.id), name: 'PF Preflight Requester', email: `${PF.toLowerCase()}req-${TS}@example.org`, organizationId: 1, roles: ['mentee'] });
     const req = await c.mentoring.createSessionRequest(requester, { requesteeId: mentorId, title: `${PF}session`, agenda: `${PF}preflight request`, startDate: start, endDate: start + 3600 });
     const mine = await c.mentoring.listSessionRequests(requester);
     const listed = mine.data.some((r) => r.id === req.id);

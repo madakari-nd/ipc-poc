@@ -79,9 +79,12 @@ describe.skipIf(!!skipReason)('ELEVATE client (real stack)', () => {
       expect((err as ElevateError).status).toBeLessThan(500);
     });
     it.skipIf(!hasAdmin)('assignRole (needs ELEVATE_ADMIN_EMAIL/PASSWORD from seed)', async () => {
-      const admin = (await c.user.login(env.ELEVATE_ADMIN_EMAIL!, env.ELEVATE_ADMIN_PASSWORD!)).access_token;
+      // Lab admin logs in on /admin/login; assignRole ends the target's sessions, so a separate
+      // user takes the role and `user.token` stays valid for the later tests.
+      const admin = (await c.user.adminLogin(env.ELEVATE_ADMIN_EMAIL!, env.ELEVATE_ADMIN_PASSWORD!)).access_token;
       const role = (await c.user.listRoles(admin)).find((r) => r.title === 'user')!;
-      await c.user.assignRole(admin, { user_id: user.id, role_id: role.id });
+      const target = await c.user.createAccount({ name: 'PF Integration Role User', email: `${PF.toLowerCase()}role-${TS}@example.org`, password });
+      await c.user.assignRole(admin, { user_id: target.user.id, role_id: role.id });
     });
     it.skipIf(!hasOrgAdmin)('deactivateUsers (needs ELEVATE_ORG_ADMIN_EMAIL/PASSWORD from seed)', async () => {
       const orgAdmin = (await c.user.login(env.ELEVATE_ORG_ADMIN_EMAIL!, env.ELEVATE_ORG_ADMIN_PASSWORD!)).access_token;
@@ -201,7 +204,9 @@ describe.skipIf(!!skipReason)('ELEVATE client (real stack)', () => {
       expect(typeof (await c.mentoring.isAvailable(officer, mentorId!, s, s + 3600))).toBe('boolean');
     });
     it('createSessionRequest then listSessionRequests shows it', async () => {
-      const s = Math.floor(Date.now() / 1000) + 5 * 86400;
+      const s = Math.floor(Date.now() / 1000) + 5 * 86400 + (Math.floor(TS / 1000) % 480) * 3600; // fresh slot per run
+      // Mentoring creates no profile for new users on this stack; accept needs the requester's.
+      await c.mentoring.addUserExtension({ id: user.id, name: 'PF Integration User', email: `${PF.toLowerCase()}u-${TS}@example.org`, organizationId: 1, roles: ['mentee'] });
       requestId = (await c.mentoring.createSessionRequest(user.token, { requesteeId: mentorId!, title: `${PF}session`, agenda: `${PF}agenda`, startDate: s, endDate: s + 3600 })).id;
       expect((await c.mentoring.listSessionRequests(user.token)).data.map((r) => r.id)).toContain(requestId);
     });
