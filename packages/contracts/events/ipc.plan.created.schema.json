@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.plan.created.schema.json",
+  "title": "ipc.plan.created",
+  "description": "A draft plan was approved and created in ELEVATE project-service as revision 1 (FR-012, FR-018a). Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.plan.created"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "plan"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "wardId",
+        "facilityId",
+        "cycleId",
+        "sourceAssessmentId",
+        "revision",
+        "planTemplateVersion",
+        "taskCount",
+        "taskCountsByRisk",
+        "carriedOverTaskIds",
+        "approvedBy",
+        "approvedAt"
+      ],
+      "properties": {
+        "planId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "wardId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "facilityId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "cycleId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "sourceAssessmentId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "revision": {
+          "type": "integer",
+          "const": 1
+        },
+        "planTemplateVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "elevateProjectId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "taskCountsByRisk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "critical",
+            "high",
+            "normal"
+          ],
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "normal": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "carriedOverTaskIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/objectId"
+          }
+        },
+        "approvedBy": {
+          "$ref": "#/$defs/userId"
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

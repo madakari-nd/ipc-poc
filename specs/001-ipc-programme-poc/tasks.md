@@ -27,30 +27,30 @@ its own once Phase 2 is done.
 
 **Purpose**: monorepo, tooling, infrastructure skeleton.
 
-- [ ] T001 Create the npm-workspace monorepo layout from plan.md, with a root `package.json` (workspaces `apps/*`, `services/*`, `packages/*`), `.nvmrc` (22) and `tsconfig.base.json` (strict, ES2022, NodeNext)
-- [ ] T002 [P] Configure ESLint (typescript-eslint, import, jsx-a11y, react-hooks) and Prettier in `eslint.config.js` and `.prettierrc`; add root scripts `lint`, `format`, `typecheck`
-- [ ] T003 [P] Configure Vitest workspace in `vitest.workspace.ts` with a coverage threshold of 80% lines on `services/workflow/src/domain/**` and `services/edge/src/{scope,middleware,evidence,session}/**` (Constitution XI: Workflow and Edge business modules)
-- [ ] T004 [P] Add git hygiene:
+- [X] T001 Create the npm-workspace monorepo layout from plan.md, with a root `package.json` (workspaces `apps/*`, `services/*`, `packages/*`), `.nvmrc` (22) and `tsconfig.base.json` (strict, ES2022, NodeNext)
+- [X] T002 [P] Configure ESLint (typescript-eslint, import, jsx-a11y, react-hooks) and Prettier in `eslint.config.js` and `.prettierrc`; add root scripts `lint`, `format`, `typecheck`
+- [X] T003 [P] Configure Vitest workspace in `vitest.workspace.ts` with a coverage threshold of 80% lines on `services/workflow/src/domain/**` and `services/edge/src/{scope,middleware,evidence,session}/**` (Constitution XI: Workflow and Edge business modules)
+- [X] T004 [P] Add git hygiene:
   - `.gitignore` covering `.env.*` except `.env.example`, plus `node_modules`, `dist` and `coverage`
   - a gitleaks pre-commit hook in `.husky/pre-commit`
   - commitlint (Conventional Commits) in `commitlint.config.js`
-- [ ] T005 [P] Copy `specs/001-ipc-programme-poc/contracts/` into `packages/contracts/` (`openapi.yaml`, `events/*.schema.json`). Add `npm run contracts:gen`, which uses openapi-typescript to produce `packages/contracts/src/generated.ts`, and `contracts:lint` (redocly)
-- [ ] T006 [P] Create `infra/compose/docker-compose.yml` with these services:
+- [X] T005 [P] Copy `specs/001-ipc-programme-poc/contracts/` into `packages/contracts/` (`openapi.yaml`, `events/*.schema.json`). Add `npm run contracts:gen`, which uses openapi-typescript to produce `packages/contracts/src/generated.ts`, and `contracts:lint` (redocly)
+- [X] T006 [P] Create `infra/compose/docker-compose.yml` with these services:
   - mongo (single-node rs0) and minio (versioning; no object lock on the evidence prefix)
   - edge, workflow and adapters
   - caddy, backup, prometheus, grafana and alertmanager
-- [ ] T007 [P] Write a multi-stage `Dockerfile` for each deployable (`services/{edge,workflow,adapters}/Dockerfile`, and `apps/{field,officer}/Dockerfile` that builds static files served by Caddy). Use a non-root user, pin base images by digest, and add a healthcheck (NFR-006) Required before T011 and the Phase 2 checkpoint.
+- [X] T007 [P] Write a multi-stage `Dockerfile` for each deployable (`services/{edge,workflow,adapters}/Dockerfile`, and `apps/{field,officer}/Dockerfile` that builds static files served by Caddy). Use a non-root user, pin base images by digest, and add a healthcheck (NFR-006) Required before T011 and the Phase 2 checkpoint.
 
   Use three networks: `public`, `private`, and `stack_samiksha_net` as external. Expose only caddy on :443. The edge joins `public` and `private`; its private port :8081 is never published.
-- [ ] T008 [P] Create profile overlays `infra/compose/profile.{dev,test,uat,prod}.yml` and `infra/compose/.env.example`. Each profile gets its own DB name, bucket, topic suffix, consumer group and ELEVATE org code (NFR-001, research E16). ELEVATE tokens are split per service (research E15)
-- [ ] T009 [P] Configure `infra/caddy/Caddyfile`: TLS with the internal CA, `/ipc/*` → edge, `/field/*` and `/officer/*` → static app builds; HSTS and secure headers
-- [ ] T010 [P] Create `.github/workflows/ci.yml` (hosted runner), a PR template with the review checklist in `.github/pull_request_template.md`, and branch protection on `main` that requires green checks (NFR-012):
+- [X] T008 [P] Create profile overlays `infra/compose/profile.{dev,test,uat,prod}.yml` and `infra/compose/.env.example`. Each profile gets its own DB name, bucket, topic suffix, consumer group and ELEVATE org code (NFR-001, research E16). ELEVATE tokens are split per service (research E15)
+- [X] T009 [P] Configure `infra/caddy/Caddyfile`: TLS with the internal CA, `/ipc/*` → edge, `/field/*` and `/officer/*` → static app builds; HSTS and secure headers
+- [X] T010 [P] Create `.github/workflows/ci.yml` (hosted runner), a PR template with the review checklist in `.github/pull_request_template.md`, and branch protection on `main` that requires green checks (NFR-012; BLOCKED: GitHub Free does not allow protection on private repos — enable after a Pro upgrade or org move):
   - lint, typecheck and unit + contract tests
   - build
   - npm audit and gitleaks
   - Trivy image scan with a fail-on-critical gate
   - bundle-size budget of 250 KB gzip per route
-- [ ] T011 [P] Create `.github/workflows/integration.yml` for the self-hosted runner. It runs preflight, integration, E2E and security tests against the real ELEVATE in the `test` profile (research T14)
+- [X] T011 [P] Create `.github/workflows/integration.yml` for the self-hosted runner. It runs preflight, integration, E2E and security tests against the real ELEVATE in the `test` profile (research T14)
 
 ---
 

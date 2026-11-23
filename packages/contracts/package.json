@@ -1,0 +1,19 @@
+{
+  "name": "@ipc/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Contract-first source of truth (Constitution V): OpenAPI 3.1 + ipc.* event schemas",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }, "./openapi.yaml": "./openapi.yaml", "./events/*": "./events/*" },
+  "files": ["dist", "openapi.yaml", "events"],
+  "scripts": {
+    "gen": "openapi-typescript openapi.yaml -o src/generated.ts",
+    "lint": "redocly lint openapi.yaml",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1", "yaml": "2.9.1" },
+  "devDependencies": { "openapi-typescript": "7.13.0", "@redocly/cli": "1.25.11" }
+}

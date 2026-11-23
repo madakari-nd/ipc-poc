@@ -1,0 +1,6 @@
+# Secret scan (gitleaks) on staged changes; fails the commit on any finding.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || exit 1
+else
+  docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.21.2 protect --staged --redact --no-banner || exit 1
+fi

@@ -1,0 +1,26 @@
+name: integration
+# Runs against the REAL local ELEVATE stack (Constitution I) on the self-hosted runner (demo laptop).
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: { group: elevate-integration, cancel-in-progress: false }
+jobs:
+  elevate:
+    runs-on: [self-hosted, linux, elevate]
+    env: { IPC_PROFILE: test }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: Pre-flight (every ELEVATE capability; fails on modified ELEVATE files)
+        run: npm run preflight -- --profile test
+      - run: npm run up -- --profile test
+      - run: npm run seed -- --profile test
+      - run: npm run test:integration
+      - run: npm run test:security
+      - run: npx playwright install --with-deps chromium && npm run test:e2e
+      - if: always()
+        run: npm run down -- --profile test

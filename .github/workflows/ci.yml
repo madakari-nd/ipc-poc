@@ -1,0 +1,47 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run contracts:lint
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build -w @ipc/contracts -w @ipc/platform -w @ipc/elevate-client -w @ipc/design-system
+      - run: npm run typecheck
+      - name: Unit + contract tests with coverage gate (Constitution XI)
+        run: npm run test:coverage -- --project '!integration' --project '!security'
+      - run: npm run build
+      - name: Bundle budget (<= 250 KB gzip per route)
+        run: node scripts/bundle-budget.mjs
+      - run: npm audit --omit=dev --audit-level=critical
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+  images:
+    runs-on: ubuntu-24.04
+    needs: quality
+    strategy:
+      matrix: { target: [services/edge, services/workflow, services/adapters, apps/field, apps/officer] }
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f ${{ matrix.target }}/Dockerfile -t ipc/scan:${{ github.sha }} .
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ipc/scan:${{ github.sha }}
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true

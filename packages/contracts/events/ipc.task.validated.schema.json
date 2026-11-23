@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ipc.localhost/contracts/events/ipc.task.validated.schema.json",
+  "title": "ipc.task.validated",
+  "description": "An IPC officer or district quality manager validated or returned a critical/high task (FR-013, FR-014). Published on topic ipc.<profile>.<name> keyed by wardId (or checklistCode for checklist events) through the workflow/adapters outbox, validated against this schema before publishing (FR-027). Contains no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "type",
+    "version",
+    "occurredAt",
+    "programmeAt",
+    "profile",
+    "correlationId",
+    "actor",
+    "subject",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "const": "ipc.task.validated"
+    },
+    "version": {
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server real time."
+    },
+    "programmeAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Programme (demo) clock time."
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "test",
+        "uat",
+        "prod"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "const": "task"
+        },
+        "id": {
+          "$ref": "#/$defs/objectId"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionId",
+        "taskId",
+        "planId",
+        "wardId",
+        "facilityId",
+        "riskLevel",
+        "kind",
+        "reasonCode",
+        "fromState",
+        "toState",
+        "rejectionCount",
+        "evidenceHashes"
+      ],
+      "properties": {
+        "decisionId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "taskId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "planId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "wardId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "facilityId": {
+          "$ref": "#/$defs/objectId"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "validate",
+            "validation_return"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "MEETS_STANDARD",
+            "MEETS_STANDARD_WITH_NOTE",
+            "EVIDENCE_UNCLEAR",
+            "EVIDENCE_INCOMPLETE",
+            "WRONG_LOCATION_OR_ITEM",
+            "STANDARD_NOT_MET",
+            "PATIENT_DATA_VISIBLE",
+            "OTHER"
+          ]
+        },
+        "fromState": {
+          "const": "PENDING_VALIDATION"
+        },
+        "toState": {
+          "type": "string",
+          "enum": [
+            "CLOSED",
+            "CHANGES_REQUESTED"
+          ]
+        },
+        "rejectionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidenceHashes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "userId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "ELEVATE user id."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userId",
+        "role"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "ELEVATE user id, or 'system' for consumers, sweeps and reconciliation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "STATE_ADMIN",
+            "DISTRICT_QM",
+            "IPC_OFFICER",
+            "WARD_SUPERVISOR",
+            "FRONTLINE",
+            "MENTOR",
+            "EXTERNAL_AUDITOR",
+            "SYSTEM"
+          ]
+        }
+      }
+    }
+  }
+}

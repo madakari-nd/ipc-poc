@@ -1,0 +1,27 @@
+{
+  "name": "@ipc/elevate-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed clients for the REAL ELEVATE services (Constitution I)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ipc/platform": "0.1.0",
+    "undici": "7.30.2",
+    "kafkajs": "2.2.4",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {}
+}

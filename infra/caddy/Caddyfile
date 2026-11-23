@@ -1,0 +1,39 @@
+{
+	admin off
+	local_certs
+}
+
+https:// {
+	tls internal
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=()"
+		-Server
+	}
+
+	# Programme Edge (only public API). Internal routes are never proxied.
+	handle /ipc/* {
+		reverse_proxy edge:8080
+	}
+	# Presigned evidence URLs (short-lived; scope checked by the edge before issuing)
+	handle_path /evidence-store/* {
+		reverse_proxy minio:9000
+	}
+	handle_path /field/* {
+		root * /srv/field
+		try_files {path} /index.html
+		file_server
+	}
+	handle_path /officer/* {
+		root * /srv/officer
+		try_files {path} /index.html
+		file_server
+	}
+	handle {
+		redir /officer/ 302
+	}
+}

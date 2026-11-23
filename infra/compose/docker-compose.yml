@@ -1,0 +1,143 @@
+# Programme layer for the IPC POC. ELEVATE runs separately (prerequisite) on the external
+# network stack_samiksha_net. Trust boundaries (Constitution X): only caddy publishes a port.
+name: ipc-${IPC_PROFILE:-dev}
+
+x-node-service: &node-service
+  restart: unless-stopped
+  env_file: [.env.${IPC_PROFILE:-dev}]
+  environment:
+    IPC_PROFILE: ${IPC_PROFILE:-dev}
+  stop_grace_period: 35s   # graceful drain within 30 s (NFR-004)
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports: ["${IPC_HTTPS_PORT:-443}:443"]
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - field_dist:/srv/field:ro
+      - officer_dist:/srv/officer:ro
+    networks: [public]
+    depends_on: [edge]
+
+  edge:
+    <<: *node-service
+    image: ${IPC_REGISTRY:-ipc}/edge:${IPC_TAG:-dev}
+    build: { context: ../.., dockerfile: services/edge/Dockerfile }
+    networks: [public, private, stack_samiksha_net]   # :8080 public via caddy, :8081 private only
+    depends_on: { mongo: { condition: service_healthy }, minio: { condition: service_healthy } }
+
+  workflow:
+    <<: *node-service
+    image: ${IPC_REGISTRY:-ipc}/workflow:${IPC_TAG:-dev}
+    build: { context: ../.., dockerfile: services/workflow/Dockerfile }
+    networks: [private, stack_samiksha_net]           # scheduler callback + Kafka need ELEVATE net
+    depends_on: { mongo: { condition: service_healthy } }
+
+  adapters:
+    <<: *node-service
+    image: ${IPC_REGISTRY:-ipc}/adapters:${IPC_TAG:-dev}
+    build: { context: ../.., dockerfile: services/adapters/Dockerfile }
+    networks: [private, stack_samiksha_net]
+    depends_on: { mongo: { condition: service_healthy } }
+
+  field-build:
+    image: ${IPC_REGISTRY:-ipc}/field:${IPC_TAG:-dev}
+    build: { context: ../.., dockerfile: apps/field/Dockerfile }
+    volumes: [field_dist:/out]
+    command: ["sh", "-c", "cp -r /app/dist/. /out/"]
+    restart: "no"
+
+  officer-build:
+    image: ${IPC_REGISTRY:-ipc}/officer:${IPC_TAG:-dev}
+    build: { context: ../.., dockerfile: apps/officer/Dockerfile }
+    volumes: [officer_dist:/out]
+    command: ["sh", "-c", "cp -r /app/dist/. /out/"]
+    restart: "no"
+
+  mongo:
+    image: mongo:7.0.14
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all", "--keyFile", "/etc/mongo/keyfile", "--auth"]
+    entrypoint: ["/usr/local/bin/mongo-entry.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+      - ../mongo/mongo-entry.sh:/usr/local/bin/mongo-entry.sh:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "${MONGO_ROOT_USER}", "-p", "${MONGO_ROOT_PASSWORD}", "--eval", "try{rs.status().ok}catch(e){rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok}"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    networks: [private]
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [private, public]   # presigned URLs are fetched by browsers via caddy /evidence-store/
+
+  backup:
+    image: ${IPC_REGISTRY:-ipc}/backup:${IPC_TAG:-dev}
+    build: { context: ../backup }
+    restart: unless-stopped
+    env_file: [.env.${IPC_PROFILE:-dev}]
+    volumes: [../backup/data:/backup]
+    networks: [private]
+    depends_on: { mongo: { condition: service_healthy }, minio: { condition: service_healthy } }
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    volumes:
+      - ../prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    networks: [private]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    volumes: [../alertmanager:/etc/alertmanager:ro]
+    networks: [private]
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    restart: unless-stopped
+    ports: ["127.0.0.1:${IPC_GRAFANA_PORT:-3300}:3000"]   # loopback only (operator console)
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ../grafana:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    networks: [private]
+
+networks:
+  public: {}
+  private: { internal: true }   # no internet egress, no ingress
+  stack_samiksha_net: { external: true }
+
+volumes:
+  caddy_data: {}
+  mongo_data: {}
+  minio_data: {}
+  prometheus_data: {}
+  grafana_data: {}
+  field_dist: {}
+  officer_dist: {}

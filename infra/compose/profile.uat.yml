@@ -1,0 +1,10 @@
+# Profile overlay: uat. Separate DB, bucket, topic suffix, consumer group and ELEVATE org (NFR-001).
+services:
+  edge:
+    environment: { IPC_PROFILE: uat, DEMO_MODE: "true" }
+  workflow:
+    environment: { IPC_PROFILE: uat, DEMO_MODE: "true" }
+  adapters:
+    environment: { IPC_PROFILE: uat }
+  caddy:
+    ports: !override ["443:443"]

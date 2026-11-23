@@ -1,0 +1,36 @@
+{
+  "name": "@ipc/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Integration adapters: facility/HR import, SMS stand-in, analytics feed",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "migrate:up": "migrate-mongo up -f migrate-mongo-config.cjs",
+    "migrate:down": "migrate-mongo down -f migrate-mongo-config.cjs"
+  },
+  "dependencies": {
+    "@ipc/platform": "0.1.0",
+    "@ipc/contracts": "0.1.0",
+    "@ipc/elevate-client": "0.1.0",
+    "express": "5.1.0",
+    "mongoose": "8.24.10",
+    "zod": "3.25.76",
+    "jose": "5.10.0",
+    "migrate-mongo": "14.0.7",
+    "pino": "9.14.0",
+    "kafkajs": "2.2.4",
+    "csv-parse": "5.6.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "supertest": "7.3.2",
+    "@types/supertest": "6.0.3",
+    "mongodb-memory-server": "10.4.3",
+    "express-openapi-validator": "5.6.2"
+  }
+}

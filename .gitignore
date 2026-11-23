@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env*
+!.env.example
+.DS_Store
+*.tmp
+*.swp
+.vscode/
+.idea/
+playwright-report/
+test-results/
+infra/backup/data/
+infra/caddy/data/
