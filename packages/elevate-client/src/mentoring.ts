@@ -113,6 +113,26 @@ export class MentoringClient {
     });
   }
 
+  /**
+   * g6 step 3: creates the mentoring user extension through mentoring's internal `users/add`, the
+   * same path its user-create event consumer takes. Needed on this stack because the role-change
+   * callback fails with MENTEE_EXTENSION_NOT_FOUND when no extension exists yet, and `users/create`
+   * cannot read the profile without a token (observed 2026-11-23).
+   */
+  async addUserExtension(input: { id: number; name: string; email: string; organizationId: number | string; roles: string[] }): Promise<unknown> {
+    const r = await this.http.call({
+      operation: 'users.add', method: 'POST', path: '/mentoring/v1/users/add',
+      json: { id: input.id, name: input.name, email: input.email, organization_id: String(input.organizationId), roles: input.roles.map((title) => ({ title })) },
+      headers: { internal_access_token: this.internalToken() },
+    });
+    return (r as { result?: unknown })?.result;
+  }
+
+  private internalToken(): string {
+    const h = this.http.buildHeaders({ internal: true });
+    return h['internal-access-token'] ?? h.internal_access_token ?? '';
+  }
+
   async approveMentorRole(orgAdminToken: string, requestId: number) {
     if (!this.user) throw new Error('MentoringClient needs a UserClient for role requests');
     return this.user.updateRoleRequest(orgAdminToken, requestId, 'APPROVED');

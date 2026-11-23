@@ -199,9 +199,14 @@ export class ElevateHttp {
 
   async call<S extends z.ZodTypeAny | undefined = undefined>(spec: CallSpec<S>): Promise<Result<S>> {
     const headers = this.buildHeaders(spec.auth, spec.headers);
-    let body: string | FormData | undefined;
-    if (spec.form) body = spec.form;
-    else if (spec.json !== undefined) {
+    let body: string | Buffer | undefined;
+    if (spec.form) {
+      // Encode multipart to bytes here: the global (Node-bundled) FormData is not accepted by the
+      // npm undici `request` ("action is not a function"), so the boundary is fixed up front.
+      const encoded = new Response(spec.form);
+      body = Buffer.from(await encoded.arrayBuffer());
+      headers['content-type'] = encoded.headers.get('content-type') ?? 'multipart/form-data';
+    } else if (spec.json !== undefined) {
       body = JSON.stringify(spec.json);
       headers['content-type'] = 'application/json';
     }

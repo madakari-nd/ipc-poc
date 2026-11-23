@@ -14,3 +14,4 @@ playwright-report/
 test-results/
 infra/backup/data/
 infra/caddy/data/
+infra/compose/.seed-state.*

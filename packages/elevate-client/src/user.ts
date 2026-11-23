@@ -70,6 +70,15 @@ export class UserClient {
     return r.result;
   }
 
+  /** Lab/platform admin login (`admin` role). The body key is `identifier`; `email` is rejected. */
+  async adminLogin(identifier: string, password: string): Promise<LoginResult> {
+    const r = await this.http.call({
+      operation: 'admin.login', method: 'POST', path: '/user/v1/admin/login',
+      json: { identifier, password }, auth: { origin: true }, schema: Envelope(LoginResult),
+    });
+    return r.result;
+  }
+
   /** New access token from a refresh token (returns only access_token in image 3.4.0). */
   async refresh(refreshToken: string): Promise<{ access_token: string }> {
     const r = await this.http.call({

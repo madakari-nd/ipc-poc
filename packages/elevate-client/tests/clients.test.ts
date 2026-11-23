@@ -117,3 +117,57 @@ describe('ProjectClient / MentoringClient / SchedulerClient', () => {
     expect(await new SchedulerClient(http('scheduler')).listJobs(['delayed'])).toEqual([]);
   });
 });
+
+describe('seed provisioning calls (T054)', () => {
+  it('logs the lab admin in on /admin/login with `identifier`', async () => {
+    const seen = stub('POST', '/user/v1/admin/login', { result: { access_token: 'a', refresh_token: 'r', user: { id: 26, name: 'Admin' } } });
+    expect((await new UserClient(http('user')).adminLogin('admin@example.org', 'pw')).user.id).toBe(26);
+    expect(seen[0]!.body).toEqual({ identifier: 'admin@example.org', password: 'pw' });
+  });
+
+  it('creates a programme and a cycle solution with the internal token and the org-admin token', async () => {
+    const p = stub('POST', '/project/v1/programs/create', { result: { _id: 'pg1', externalId: 'TEST-PROG' } });
+    const s = stub('POST', '/project/v1/solutions/create', { result: { _id: 's1' } });
+    const c = new ProjectClient(http('project'));
+    await c.createProgram('oa', { externalId: 'TEST-PROG', name: 'TEST programme', scope: { organizations: ['default_code'] } });
+    expect((await c.createSolution('oa', { programExternalId: 'TEST-PROG', externalId: 'TEST-SOL', name: 'TEST C1', scope: {} }))._id).toBe('s1');
+    expect(p[0]!.headers).toMatchObject({ 'x-auth-token': 'oa', 'internal-access-token': 'int-tok' });
+    expect(p[0]!.body).toMatchObject({ requestForPIIConsent: false, scope: { organizations: ['default_code'] } });
+    expect(s[0]!.body).toMatchObject({ type: 'improvementProject', isReusable: false, programExternalId: 'TEST-PROG' });
+  });
+
+  it('uploads template CSV rows and parses the _SYSTEM_ID echo', async () => {
+    let body = '';
+    agent.get(BASE).intercept({ path: '/project/v1/project/templates/bulkCreate', method: 'POST' }).reply(200, (o) => {
+      body = String(o.body ?? '');
+      return '"title","externalId","_SYSTEM_ID"\n"T","TEST-T","abc123"\n';
+    });
+    const rows = await new ProjectClient(http('project')).bulkCreateTemplates('oa', [{ title: 'T', externalId: 'TEST-T' }]);
+    expect(rows).toEqual([{ title: 'T', externalId: 'TEST-T', _SYSTEM_ID: 'abc123' }]);
+    expect(typeof body).toBe('string');
+  });
+});
+
+describe('multipart uploads', () => {
+  it('sends mappingUpload as encoded multipart bytes with a boundary', async () => {
+    let ct = '';
+    let body = '';
+    agent.get(BASE).intercept({ path: '/entity-management/v1/entities/mappingUpload', method: 'POST' }).reply(200, (o) => {
+      ct = String((o.headers as Record<string, string>)['content-type']);
+      body = Buffer.isBuffer(o.body) ? o.body.toString() : String(o.body);
+      return JSON.stringify({ result: [] });
+    });
+    await new EntityClient(http('entity')).mappingUpload({ userToken: 'jwt' }, [{ parentId: 'p1', childId: 'c1' }]);
+    expect(ct).toMatch(/^multipart\/form-data; boundary=/);
+    expect(body).toContain('parentEntiyId,childEntityId\np1,c1');
+  });
+});
+
+describe('mentor extension (g6 step 3)', () => {
+  it('posts users/add with the underscore internal header mentoring reads', async () => {
+    const seen = stub('POST', '/mentoring/v1/users/add', { result: { user_id: '69' } });
+    await new MentoringClient(http('mentoring')).addUserExtension({ id: 69, name: 'TEST Mentor', email: 'm@example.org', organizationId: 1, roles: ['mentor'] });
+    expect(seen[0]!.headers.internal_access_token).toBe('int-tok');
+    expect(seen[0]!.body).toEqual({ id: 69, name: 'TEST Mentor', email: 'm@example.org', organization_id: '1', roles: [{ title: 'mentor' }] });
+  });
+});

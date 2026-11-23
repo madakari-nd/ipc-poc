@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ElevateHttp } from './http.js';
+import { csvCell, parseCsv, type ElevateHttp } from './http.js';
 
 const Envelope = <T extends z.ZodTypeAny>(result: T) => z.object({ result }).passthrough();
 
@@ -96,5 +96,55 @@ export class ProjectClient {
       json: { ...extra, tasks: tasks.map((t) => ({ type: 'simple', children: [], attachments: [], isDeletable: true, ...t })) },
       auth: { userToken: serviceToken },
     });
+  }
+
+  /**
+   * f1 (CONFIGURE): reusable project templates from CSV rows. Internal route; the caller's token
+   * must be an org_admin (its org becomes the template org). Columns listed in `_arrayFields` are
+   * split on commas. Returns ELEVATE's CSV echo with `_SYSTEM_ID` per row (an id, or
+   * "PROJECT_TEMPLATE_EXISTS"-style text when the externalId is already taken).
+   */
+  async bulkCreateTemplates(orgAdminToken: string, rows: Record<string, unknown>[]): Promise<Record<string, string>[]> {
+    return this.csvUpload('templates.bulkCreate', '/project/v1/project/templates/bulkCreate', 'projectTemplates', orgAdminToken, rows);
+  }
+
+  /** f1: tasks of a template (CSV, internal + org_admin token). Echo rows carry `_SYSTEM_ID` and `STATUS`. */
+  async bulkCreateTemplateTasks(orgAdminToken: string, templateId: string, rows: Record<string, unknown>[]): Promise<Record<string, string>[]> {
+    return this.csvUpload('templateTasks.bulkCreate', `/project/v1/project/templateTasks/bulkCreate/${encodeURIComponent(templateId)}`,
+      'projectTemplateTasks', orgAdminToken, rows);
+  }
+
+  /** f2 step 1: programme container for the cycle plan solutions (internal + org_admin token). */
+  async createProgram(orgAdminToken: string, input: {
+    externalId: string; name: string; description?: string; scope: Record<string, unknown>;
+  }): Promise<{ _id: string; externalId: string }> {
+    const r = await this.http.call({
+      operation: 'programs.create', method: 'POST', path: '/project/v1/programs/create',
+      json: { description: input.name, requestForPIIConsent: false, isAPrivateProgram: false, ...input },
+      auth: { userToken: orgAdminToken, internal: true },
+      schema: Envelope(z.object({ _id: z.string(), externalId: z.string() }).passthrough()),
+    });
+    return r.result;
+  }
+
+  /** f2 step 2: one improvement-project solution per cycle (FR-018a). */
+  async createSolution(orgAdminToken: string, input: {
+    programExternalId: string; externalId: string; name: string; description?: string; scope: Record<string, unknown>;
+  }): Promise<{ _id: string }> {
+    const r = await this.http.call({
+      operation: 'solutions.create', method: 'POST', path: '/project/v1/solutions/create',
+      json: { description: input.name, type: 'improvementProject', subType: 'improvementProject', isReusable: false, ...input },
+      auth: { userToken: orgAdminToken, internal: true }, schema: Envelope(z.object({ _id: z.string() }).passthrough()),
+    });
+    return r.result;
+  }
+
+  private async csvUpload(operation: string, path: string, field: string, userToken: string, rows: Record<string, unknown>[]) {
+    const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+    const csv = [cols.join(','), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n') + '\n';
+    const form = new FormData();
+    form.append(field, new Blob([csv], { type: 'text/csv' }), `${field}.csv`);
+    const text = await this.http.call({ operation, method: 'POST', path, form, auth: { userToken, internal: true }, text: true });
+    return parseCsv(String(text ?? ''));
   }
 }
