@@ -110,6 +110,29 @@ export class EntityClient {
     });
   }
 
+  /** c1b: create an entity type (CONFIGURE, admin). Used by the seed for `hospital` and `ward`. */
+  async createType(
+    auth: EntityWriteAuth,
+    input: { name: string; isObservable?: boolean; toBeMappedToParentEntities?: boolean },
+  ): Promise<{ _id: string; name: string }> {
+    const r = await this.http.call({
+      operation: 'entityTypes.create', method: 'POST', path: '/entity-management/v1/entityTypes/create',
+      json: { isObservable: true, toBeMappedToParentEntities: true, ...input }, auth: this.writeAuth(auth),
+      schema: z.object({ result: z.object({ _id: z.string(), name: z.string() }).passthrough() }).passthrough(),
+    });
+    return r.result;
+  }
+
+  /** c1c: entity type documents (id + name) for the tenant. */
+  async entityTypeDocs(auth: EntityWriteAuth, tenantId = this.http.tenantCode): Promise<{ _id: string; name: string }[]> {
+    const r = await this.http.call({
+      operation: 'entityTypes.find', method: 'POST', path: '/entity-management/v1/entityTypes/find',
+      json: { query: { tenantId }, projection: ['name', '_id'] }, auth: this.writeAuth(auth),
+      schema: z.object({ result: z.array(z.object({ _id: z.string(), name: z.string() }).passthrough()) }).passthrough(),
+    });
+    return r.result;
+  }
+
   /** c1: list entity types for the tenant. */
   async entityTypes(auth: EntityWriteAuth, tenantId = this.http.tenantCode): Promise<string[]> {
     const r = await this.http.call({

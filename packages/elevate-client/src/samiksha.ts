@@ -160,13 +160,30 @@ export class SamikshaClient {
     return r.result;
   }
 
+  /**
+   * d2b: update solution fields (CONFIGURE). The seed uses it to point a copied checklist at the
+   * `ward` entity type. Note: ELEVATE's solutions/update $sets any field it is given; the Edge never
+   * exposes this route.
+   */
+  /** `userToken` must belong to an org_admin (samiksha's ORG_ADMIN branch; no org lookup needed). */
+  async updateSolution(userToken: string, solutionId: string, fields: Record<string, unknown>): Promise<unknown> {
+    return this.http.call({
+      operation: 'solutions.update', method: 'POST', path: `/survey/v1/solutions/update/${encodeURIComponent(solutionId)}`,
+      json: fields, auth: { userToken, internal: true }, // internal-only route in samiksha
+    });
+  }
+
   /** d3: one observation per ward, entity passed at create (updateEntities is broken, E6). */
   async createObservation(
-    userToken: string, solutionId: string, input: { name: string; description?: string; entityId: string },
+    userToken: string, solutionId: string,
+    input: { name: string; description?: string; entityId?: string; entityIds?: string[] },
   ): Promise<{ _id: string; solutionId?: string }> {
+    // E6 (revised): one observation per assessor per solution, carrying every ward in their scope.
+    const entities = input.entityIds ?? (input.entityId ? [input.entityId] : []);
+    if (entities.length === 0) throw new Error('createObservation needs at least one entity');
     const r = await this.http.call({
       operation: 'observations.create', method: 'POST', path: '/survey/v1/observations/create', query: { solutionId },
-      json: { data: { name: input.name, description: input.description ?? input.name, status: 'published', entities: [input.entityId] } },
+      json: { data: { name: input.name, description: input.description ?? input.name, status: 'published', entities } },
       auth: { userToken }, schema: Envelope(z.object({ _id: z.string(), solutionId: z.string().optional() }).passthrough()),
     });
     return r.result;
