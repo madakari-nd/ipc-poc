@@ -23,10 +23,10 @@ describe('problem+json errors (RFC 9457, Constitution V)', () => {
     expect(res.body).toMatchObject({ status: 403, code: 'SCOPE_DENIED', title: 'Forbidden', detail: 'Outside your scope', correlationId: '0af7651916cd43dd8448eb211c80319c' });
   });
 
-  it('hides internals of unexpected errors behind 500 INTERNAL', async () => {
+  it('hides internals of unexpected errors behind 500 INTERNAL_ERROR', async () => {
     const res = await request(app(() => { throw new Error('db password=x leaked'); })).get('/boom');
     expect(res.status).toBe(500);
-    expect(res.body.code).toBe('INTERNAL');
+    expect(res.body.code).toBe('INTERNAL_ERROR');
     expect(JSON.stringify(res.body)).not.toContain('password');
   });
 

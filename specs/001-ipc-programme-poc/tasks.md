@@ -71,72 +71,72 @@ its own once Phase 2 is done.
 
 ### ELEVATE client package (real ELEVATE; unit tests stub only these interfaces)
 
-- [ ] T018 Write `packages/elevate-client/src/http.ts`: a base client using undici and the resilience policies, auth header builders (x-auth-token, internal-access-token, per-service admin token) and the ELEVATE-call metrics
-- [ ] T019 [P] Write `packages/elevate-client/src/user.ts`: login, profile, account create, assignRole, deactivateUser (research E1, E2)
-- [ ] T020 [P] Write `packages/elevate-client/src/entity.ts`: bulkCreate CSV, mappingUpload, find by externalId (E4)
-- [ ] T021 [P] Write `packages/elevate-client/src/samiksha.ts`: solution read, importFromSolution, observation create with `data.entities`, form fetch, observationSubmissions/update (E5–E7)
-- [ ] T022 [P] Write `packages/elevate-client/src/project.ts`: template import, importFromLibrary, userProjects/sync, details (E9)
-- [ ] T023 [P] Write `packages/elevate-client/src/mentoring.ts`: role request/approve, availability/isAvailable, requestSessions create/accept/reject/list (E3, E10, E11)
-- [ ] T024 [P] Write `packages/elevate-client/src/scheduler.ts` (jobs create/list/delete, E12) and `notification.ts` (Kafka `type:"email"` publish, E13)
-- [ ] T025 Write `scripts/preflight.ts`: the 11 checks from research.md §3. It prints PASS, FALLBACK or FAIL and writes `docs/elevate-usage.md` with, per capability, the endpoint or topic, the mode (AS-IS / CONFIGURE), the result, any fallback and the date (Constitution I). It also runs `git status --porcelain` on the ELEVATE repositories and fails if any file is modified (SC-010). Add the script `npm run preflight`
-- [ ] T026 [P] Write `tests/integration/elevate-client.int.test.ts` against the real ELEVATE in the test profile, one test per client method used by any story
+- [X] T018 Write `packages/elevate-client/src/http.ts`: a base client using undici and the resilience policies, auth header builders (x-auth-token, internal-access-token, per-service admin token) and the ELEVATE-call metrics
+- [X] T019 [P] Write `packages/elevate-client/src/user.ts`: login, profile, account create, assignRole, deactivateUser (research E1, E2)
+- [X] T020 [P] Write `packages/elevate-client/src/entity.ts`: bulkCreate CSV, mappingUpload, find by externalId (E4)
+- [X] T021 [P] Write `packages/elevate-client/src/samiksha.ts`: solution read, importFromSolution, observation create with `data.entities`, form fetch, observationSubmissions/update (E5–E7)
+- [X] T022 [P] Write `packages/elevate-client/src/project.ts`: template import, importFromLibrary, userProjects/sync, details (E9)
+- [X] T023 [P] Write `packages/elevate-client/src/mentoring.ts`: role request/approve, availability/isAvailable, requestSessions create/accept/reject/list (E3, E10, E11)
+- [X] T024 [P] Write `packages/elevate-client/src/scheduler.ts` (jobs create/list/delete, E12) and `notification.ts` (Kafka `type:"email"` publish, E13)
+- [X] T025 Write `scripts/preflight.ts`: the 11 checks from research.md §3. It prints PASS, FALLBACK or FAIL and writes `docs/elevate-usage.md` with, per capability, the endpoint or topic, the mode (AS-IS / CONFIGURE), the result, any fallback and the date (Constitution I). It also runs `git status --porcelain` on the ELEVATE repositories and fails if any file is modified (SC-010). Add the script `npm run preflight`
+- [X] T026 [P] Write `tests/integration/elevate-client.int.test.ts` against the real ELEVATE in the test profile, one test per client method used by any story
 
 ### Workflow core
 
-- [ ] T027 Scaffold `services/workflow/src/app.ts`, `server.ts` and `config/`: Express 5, platform middleware, an `/internal` router with service-JWT auth and a Mongo connection (rs0)
-- [ ] T028 Write migrate-mongo setup in `services/workflow/migrations/` (workflow-owned collections only):
+- [X] T027 Scaffold `services/workflow/src/app.ts`, `server.ts` and `config/`: Express 5, platform middleware, an `/internal` router with service-JWT auth and a Mongo connection (rs0)
+- [X] T028 Write migrate-mongo setup in `services/workflow/migrations/` (workflow-owned collections only):
   - the workflow collections and indexes from data-model.md "Indexes"
   - an app DB role with insert+find only on `ledger` (research T12)
   - a reversible down migration
-- [ ] T029 Write migrate-mongo setup in `services/edge/migrations/` for the edge-owned collections (sessions, idempotency with a 7-day TTL, EvidenceItem, DeviceQueueStatus, PurgeListEntry with a unique objectKey): their indexes, plus reversible down migrations (Constitution II, XIII)
-- [ ] T030 Write the ledger, test-first:
+- [X] T029 Write migrate-mongo setup in `services/edge/migrations/` for the edge-owned collections (sessions, idempotency with a 7-day TTL, EvidenceItem, DeviceQueueStatus, PurgeListEntry with a unique objectKey): their indexes, plus reversible down migrations (Constitution II, XIII)
+- [X] T030 Write the ledger, test-first:
   - first the unit tests in `services/workflow/tests/domain/ledger.test.ts` (chain, canonical JSON, first broken seq)
   - then `services/workflow/src/ledger/{ledger.repository.ts,ledger.service.ts}`
   - then `scripts/ledger-verify.ts` (`npm run ledger:verify`)
   - `services/workflow/src/routes/internal/ledger.routes.ts`, which serves `internalAppendLedger` (service JWT)
-- [ ] T031 Write `services/workflow/src/clock/clock.ts`, test-first in `tests/domain/clock.test.ts`: `programmeNow()` with an offset, allowed only when DEMO_MODE and the profile is dev, test or uat, and every change recorded in the ledger (FR-038)
-- [ ] T032 Write `services/workflow/src/repositories/tx.ts`: the transaction helper `withTx(fn)`, which commits the state change, the ledger record and the outbox event together (research T4)
-- [ ] T033 Write the outbox:
+- [X] T031 Write `services/workflow/src/clock/clock.ts`, test-first in `tests/domain/clock.test.ts`: `programmeNow()` with an offset, allowed only when DEMO_MODE and the profile is dev, test or uat, and every change recorded in the ledger (FR-038)
+- [X] T032 Write `services/workflow/src/repositories/tx.ts`: the transaction helper `withTx(fn)`, which commits the state change, the ledger record and the outbox event together (research T4)
+- [X] T033 Write the outbox:
   - `services/workflow/src/services/outbox.publisher.ts`: kafkajs publish of `ipc.<profile>.*`, validated with ajv against the event schemas before publishing
   - its contract test in `tests/contract/events.test.ts`
-- [ ] T034 Write `services/workflow/src/consumers/base.consumer.ts`: dedupe on (topic, key, status), dead-letter writes and an orgId filter for the profile. Add `scripts/dlq-replay.ts`
-- [ ] T035 Write the scope service:
+- [X] T034 Write `services/workflow/src/consumers/base.consumer.ts`: dedupe on (topic, key, status), dead-letter writes and an orgId filter for the profile. Add `scripts/dlq-replay.ts`
+- [X] T035 Write the scope service:
   - first the unit tests in `tests/domain/scope.test.ts`, covering role ↔ scope-level rules and validity dates
   - then `services/workflow/src/domain/scope.ts` and `routes/internal/scope.routes.ts`, which give the edge each user's effective scope
-- [ ] T036 [P] Write `services/workflow/src/domain/models/*.ts`: Mongoose models for every entity in data-model.md §1–§10, each with a `v` version field and the max-500 free-text rule
+- [X] T036 [P] Write `services/workflow/src/domain/models/*.ts`: Mongoose models for every entity in data-model.md §1–§10, each with a `v` version field and the max-500 free-text rule
 
 ### Edge core
 
-- [ ] T037 Scaffold `services/edge/src/app.ts` with:
+- [X] T037 Scaffold `services/edge/src/app.ts` with:
   - Express 5 and helmet with a strict CSP
   - platform middleware and a JSON body limit
   - the `/ipc/v1` router validated against openapi.yaml at request and response level (express-openapi-validator in tests)
   - a second, private listener on :8081, bound only to the `private` network, with service-JWT auth
-- [ ] T038 Write the session layer in `services/edge/src/session/{auth.controller.ts,session.service.ts}`:
+- [X] T038 Write the session layer in `services/edge/src/session/{auth.controller.ts,session.service.ts}`:
   - the BFF cookie session: login proxies to ELEVATE `account/login`, and tokens are stored encrypted (AES-GCM) in `edge_<profile>.sessions`
   - CSRF header, 30-minute idle timeout on the web and a refreshable 7-day device session (research T2, T3)
   - logout
-- [ ] T039 Write the scope middleware, test-first in `services/edge/tests/scope.test.ts`. `services/edge/src/scope/scope.middleware.ts`:
+- [X] T039 Write the scope middleware, test-first in `services/edge/tests/scope.test.ts`. `services/edge/src/scope/scope.middleware.ts`:
   - resolves the user's scope from workflow (60 s cache)
   - strips scope, role, profile and targeting fields sent by the client
   - exposes `req.scope`
   - strips those fields before zod validation, so stripping never trips the unknown-field rule
-- [ ] T040 Write the ownership guard in `services/edge/src/scope/ownership.guard.ts`, test-first. It checks submission, project, task and evidence ownership against the scope, refusing with 403 `SCOPE_DENIED` when the resource is outside the caller's scope and 403 `NOT_OWNER` when it is in scope but owned or assigned to someone else. Every denial is logged to the ledger through workflow `internalAppendLedger`
-- [ ] T041 Write the idempotency middleware, test-first in `services/edge/tests/idempotency.test.ts`. `services/edge/src/middleware/idempotency.ts`:
+- [X] T040 Write the ownership guard in `services/edge/src/scope/ownership.guard.ts`, test-first. It checks submission, project, task and evidence ownership against the scope, refusing with 403 `SCOPE_DENIED` when the resource is outside the caller's scope and 403 `NOT_OWNER` when it is in scope but owned or assigned to someone else. Every denial is logged to the ledger through workflow `internalAppendLedger`
+- [X] T041 Write the idempotency middleware, test-first in `services/edge/tests/idempotency.test.ts`. `services/edge/src/middleware/idempotency.ts`:
   - stores the key, user, request hash and response with a 7-day TTL
   - replays the stored response for a repeated key
   - returns 422 for a reused key, 400 `IDEMPOTENCY_KEY_REQUIRED` when the key is missing, and 409 `IDEMPOTENCY_KEY_IN_PROGRESS` while the first request with that key is still running (FR-030)
-- [ ] T042 [P] Write the If-Match version middleware, test-first in `services/edge/tests/version.test.ts` (a stale version gives 409 `VERSION_CONFLICT` with the current body; a missing header gives 400 `IF_MATCH_REQUIRED`), in `services/edge/src/middleware/version.ts` and the rate limiter in `middleware/ratelimit.ts` (120/min per user, 20/min per IP on login, Mongo store, 429)
-- [ ] T043 Write the allow-list proxy in `services/edge/src/proxy/elevate.proxy.ts`: only the ELEVATE routes named in research E6/E7/E11 are allowed, and everything else returns 404, so the scheduler and internal routes are unreachable (FR-034)
-- [ ] T044 Write the evidence locker in `services/edge/src/evidence/{evidence.controller.ts,evidence.service.ts}`, test-first:
+- [X] T042 [P] Write the If-Match version middleware, test-first in `services/edge/tests/version.test.ts` (a stale version gives 409 `VERSION_CONFLICT` with the current body; a missing header gives 400 `IF_MATCH_REQUIRED`), in `services/edge/src/middleware/version.ts` and the rate limiter in `middleware/ratelimit.ts` (120/min per user, 20/min per IP on login, Mongo store, 429)
+- [X] T043 Write the allow-list proxy in `services/edge/src/proxy/elevate.proxy.ts`: only the ELEVATE routes named in research E6/E7/E11 are allowed, and everything else returns 404, so the scheduler and internal routes are unreachable (FR-034)
+- [X] T044 Write the evidence locker in `services/edge/src/evidence/{evidence.controller.ts,evidence.service.ts}`, test-first:
   - intents create a presigned PUT and confirm re-checks the SHA-256 and size
   - presigned GET links last 300 s and are issued after a scope check
   - patient-data deletion removes every object version (object lock is not applied to the evidence prefix) and adds the key to the backup purge list, keeping only the metadata
   - every action is audited
   - FR-008, FR-009, FR-029, FR-032 and research T7
   - `services/edge/src/routes/internal/evidence-dq.routes.ts`, which serves `edgeInternalEvidenceDQ` on :8081
-- [ ] T045 [P] Write `services/edge/src/routes/me.routes.ts`: `GET /me` and `GET /me/home`, the "what needs me now" home per role, aggregated from workflow (FR-036)
-- [ ] T046 [P] Write `services/edge/src/routes/device.routes.ts`: `PUT /ipc/v1/devices/{deviceId}/queue-status` (`reportDeviceQueueStatus`), which stores DeviceQueueStatus (FR-037)
+- [X] T045 [P] Write `services/edge/src/routes/me.routes.ts`: `GET /me` and `GET /me/home`, the "what needs me now" home per role, aggregated from workflow (FR-036)
+- [X] T046 [P] Write `services/edge/src/routes/device.routes.ts`: `PUT /ipc/v1/devices/{deviceId}/queue-status` (`reportDeviceQueueStatus`), which stores DeviceQueueStatus (FR-037)
 
 ### Design system and app shells
 

@@ -19,8 +19,9 @@ https:// {
 	handle /ipc/* {
 		reverse_proxy edge:8080
 	}
-	# Presigned evidence URLs (short-lived; scope checked by the edge before issuing)
-	handle_path /evidence-store/* {
+	# Presigned evidence URLs (path-style, short-lived; scope checked by the edge before issuing).
+	# Path and Host are passed through unchanged so the SigV4 signature still matches.
+	handle /ipc-evidence-* {
 		reverse_proxy minio:9000
 	}
 	handle_path /field/* {

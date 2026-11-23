@@ -8,7 +8,7 @@ export type ProblemCode =
   | 'CHECKLIST_PUBLISHED' | 'CHECKLIST_VERSION_RETIRED' | 'INVALID_TRANSITION' | 'DEPENDENCY_OPEN'
   | 'DECLARATION_REQUIRED' | 'EVIDENCE_RULE_NOT_MET' | 'RATE_LIMITED' | 'ELEVATE_UNAVAILABLE'
   | 'DEMO_MODE_DISABLED' | 'VALIDATION_FAILED' | 'UNAUTHENTICATED' | 'CSRF_INVALID'
-  | 'NOT_FOUND' | 'INTERNAL' | (string & {});
+  | 'NOT_FOUND' | 'INTERNAL_ERROR' | (string & {});
 
 const TITLES: Record<number, string> = {
   400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 409: 'Conflict',
@@ -70,6 +70,6 @@ export function problemHandler(logger?: Logger) {
     }
     if (e?.status === 413) return render(res, new Problem(413, 'VALIDATION_FAILED', 'Request too large'));
     logger?.error({ err }, 'unhandled error');
-    return render(res, new Problem(500, 'INTERNAL', 'Something went wrong. Please try again.'));
+    return render(res, new Problem(500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.'));
   };
 }
