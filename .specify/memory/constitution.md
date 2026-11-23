@@ -1,6 +1,6 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 → 1.1.1 (latest PATCH: readiness wording). 1.1.0 was MINOR: added Principle XIII
+- Version change: (template) → 1.0.0 → 1.0.1 → 1.1.0 → 1.1.1 → 1.1.2 (latest PATCH: evidence store SeaweedFS S3 replaces MinIO, whose community images are no longer pullable; readiness wording in 1.1.1). 1.1.0 was MINOR: added Principle XIII
   Almost Production Grade, per user directive). 1.0.1 was PATCH: data-pipeline removed from Principle I
   list — POC oversight uses officer-web screens; scheduler callback auth = static shared secret)
 - Principles: I–XII defined; XIII added in 1.1.0; VI readiness wording clarified in 1.1.1
@@ -205,7 +205,7 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 
 - Stack: MongoDB 7 (replica set), Express 5, React 18 (Vite), Node.js 22 LTS — MERN, TypeScript
   everywhere, npm workspaces monorepo (`apps/`, `services/`, `packages/`).
-- Object storage: S3-compatible store (MinIO in the programme compose) with bucket versioning;
+- Object storage: S3-compatible store (SeaweedFS S3 in the programme compose) with bucket versioning;
   files are never public.
 - Messaging: consume ELEVATE's existing Kafka topics; programme `ipc.*` events published to the
   same Kafka; no second broker.
@@ -237,4 +237,4 @@ Rationale: the POC exists to show that reuse works and upgrades stay cheap.
 - Compliance: every `/speckit-plan` runs the Constitution Check; every review verifies the
   NON-NEGOTIABLE principles (I, III) explicitly.
 
-**Version**: 1.1.1 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-22
+**Version**: 1.1.2 | **Ratified**: 2026-11-22 | **Last Amended**: 2026-11-23

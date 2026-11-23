@@ -4,7 +4,7 @@ name: ipc-${IPC_PROFILE:-dev}
 
 x-node-service: &node-service
   restart: unless-stopped
-  env_file: [.env.${IPC_PROFILE:-dev}]
+  env_file: [".env.${IPC_PROFILE:-dev}"]
   environment:
     IPC_PROFILE: ${IPC_PROFILE:-dev}
   stop_grace_period: 35s   # graceful drain within 30 s (NFR-004)
@@ -30,7 +30,7 @@ services:
     image: ${IPC_REGISTRY:-ipc}/edge:${IPC_TAG:-dev}
     build: { context: ../.., dockerfile: services/edge/Dockerfile }
     networks: [public, private, stack_samiksha_net]   # :8080 public via caddy, :8081 private only
-    depends_on: { mongo: { condition: service_healthy }, minio: { condition: service_healthy } }
+    depends_on: { mongo: { condition: service_healthy }, s3: { condition: service_healthy } }
 
   workflow:
     <<: *node-service
@@ -78,29 +78,30 @@ services:
       retries: 12
     networks: [private]
 
-  minio:
-    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+  s3:
+    # Evidence store: SeaweedFS (Apache-2.0, S3 API, bucket versioning). MinIO community images are
+    # no longer pullable anonymously (Docker Hub/quay), see research T7 (2026-11-23).
+    image: chrislusf/seaweedfs:4.55
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes: [minio_data:/data]
+    command: ["server", "-s3", "-s3.config=/etc/seaweedfs/s3.json", "-dir=/data"]
+    volumes:
+      - s3_data:/data
+      - ../s3/s3.${IPC_PROFILE:-dev}.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8333/healthz"]
       interval: 10s
       timeout: 5s
       retries: 12
-    networks: [private, public]   # presigned URLs are fetched by browsers via caddy /evidence-store/
+    networks: [private, public]   # presigned URLs are fetched by browsers via caddy /ipc-evidence-*
 
   backup:
     image: ${IPC_REGISTRY:-ipc}/backup:${IPC_TAG:-dev}
     build: { context: ../backup }
     restart: unless-stopped
-    env_file: [.env.${IPC_PROFILE:-dev}]
+    env_file: [".env.${IPC_PROFILE:-dev}"]
     volumes: [../backup/data:/backup]
     networks: [private]
-    depends_on: { mongo: { condition: service_healthy }, minio: { condition: service_healthy } }
+    depends_on: { mongo: { condition: service_healthy }, s3: { condition: service_healthy } }
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -136,7 +137,7 @@ networks:
 volumes:
   caddy_data: {}
   mongo_data: {}
-  minio_data: {}
+  s3_data: {}
   prometheus_data: {}
   grafana_data: {}
   field_dist: {}

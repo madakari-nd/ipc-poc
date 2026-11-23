@@ -11,7 +11,7 @@ details and fallbacks: [research.md](./research.md).
   minutes for it to start.
 - `cp infra/compose/.env.example infra/compose/.env.uat`, then fill in the secrets. The file is
   git-ignored. It holds the ELEVATE internal-access token name and value, the scheduler secret,
-  the session key, the MinIO keys and the demo user passwords.
+  the session key, the SeaweedFS S3 keys and the demo user passwords.
 
 ## 2. Bring up and seed (SC-009: ≤ 15 min, 2 commands)
 

@@ -11,7 +11,7 @@ production quality, and run all 8 journeys against the real local ELEVATE stack:
 
 - **Programme Edge** (public) — the only door: ELEVATE login → server-side session, server-derived
   scope, ownership checks on every resource, allow-list proxy to ELEVATE, idempotency keys,
-  version checks (409), rate limits, and the **evidence locker** (signed MinIO links ≤ 5 min).
+  version checks (409), rate limits, and the **evidence locker** (signed SeaweedFS S3 links ≤ 5 min).
 - **IPC Workflow Service** (private) — system of record for governance: checklist catalogue, risk
   rules, draft plans and revisions, task state machine, validations, escalations, support
   requests, baseline links, oversight read models, demo clock, and the hash-chained **audit
@@ -33,7 +33,7 @@ ELEVATE request/response shapes, verification status and fallbacks: [research.md
 
 **Primary Dependencies**:
 - Backend: Express 5, Mongoose 8, zod, pino, kafkajs, @aws-sdk/client-s3 + s3-request-presigner
-  (MinIO), cockatiel (timeout/retry/circuit breaker), undici, helmet, express-rate-limit (Mongo
+  (SeaweedFS S3), cockatiel (timeout/retry/circuit breaker), undici, helmet, express-rate-limit (Mongo
   store), prom-client, OpenTelemetry trace context propagation.
 - Frontend: Vite 5, React Router 6, TanStack Query 5, react-i18next, Tailwind CSS 3.4 (configured
   from tokens), Radix UI primitives, react-hook-form + zod, vite-plugin-pwa (Workbox), Dexie
@@ -41,7 +41,7 @@ ELEVATE request/response shapes, verification status and fallbacks: [research.md
 - Tooling: npm workspaces, ESLint + Prettier, Vitest + Supertest, Playwright + @axe-core/playwright,
   k6, Trivy, npm audit, gitleaks, GitHub Actions.
 
-**Storage**: MongoDB 7 (single-node replica set for transactions; one database per profile); MinIO
+**Storage**: MongoDB 7 (single-node replica set for transactions; one database per profile); SeaweedFS S3
 (S3 API, versioning; object lock is not applied to the evidence prefix so patient-data media can be
 purged; one bucket per profile). ELEVATE's own stores stay untouched.
 
@@ -94,12 +94,12 @@ a static secret header; the demo clock never shifts ELEVATE dates.
             ▼                                 ▼
  ┌────────────────────── PUBLIC NETWORK ─────────────────────────┐
  │ edge  (Express)  session · scope · ownership · idempotency ·  │
- │       rate limit · allow-list proxy · evidence locker (MinIO) │
+ │       rate limit · allow-list proxy · evidence locker (SeaweedFS S3) │
  └───────────────┬───────────────────────────────┬───────────────┘
    PRIVATE NETWORK│ REST (/internal, service JWT) │ S3 presign
                  ▼                               ▼
  ┌───────────────────────────────┐        ┌─────────────┐
- │ workflow (Express + consumers)│        │ MinIO       │
+ │ workflow (Express + consumers)│        │ SeaweedFS S3       │
  │ catalogue · plans · tasks ·   │        └─────────────┘
  │ escalation · support · ledger │──── Mongo (rs0) ── backup sidecar
  │ oversight read models · clock │
@@ -143,7 +143,7 @@ Workflow listens only on the private network.
 | Wards | ~150 | ~1,500 | ELEVATE entities; register in workflow |
 | Assessments / month | ~150 | ~1,500 | samiksha; context in workflow |
 | Tasks open at once | ~750 | ~7,500 | workflow + project-service |
-| Photos / month (≈2 MB) | ~2,000 (4 GB) | ~20,000 (40 GB) | MinIO |
+| Photos / month (≈2 MB) | ~2,000 (4 GB) | ~20,000 (40 GB) | SeaweedFS S3 |
 | Ledger records / month | ~20,000 | ~200,000 | workflow Mongo (append-only) |
 | Events / day | ~2,000 | ~20,000 | ELEVATE Kafka |
 
@@ -208,7 +208,7 @@ TypeScript, unit-testable).
 |------|-----------|--------------------------------------|
 | Prometheus + Grafana + Alertmanager containers | NFR-003 dashboard + 6 alerts (production grade) | Logs only cannot alert on p95 or outbox depth |
 | Caddy for TLS | NFR-005 TLS at the entry point | Self-managed certs in Express are error-prone |
-| Backup sidecar (mongodump + MinIO mirror every 15 min) | NFR-002 RPO ≤ 15 min | Manual backups are not testable |
+| Backup sidecar (mongodump + SeaweedFS S3 mirror every 15 min) | NFR-002 RPO ≤ 15 min | Manual backups are not testable |
 | Integration/E2E on a self-hosted runner (the demo laptop) | Need real ELEVATE (Principle I), which hosted CI cannot run | Mocking ELEVATE in CI violates Principle I; hosted CI still runs lint/unit/contract/build/scans |
 
 ## Post-design Constitution re-check

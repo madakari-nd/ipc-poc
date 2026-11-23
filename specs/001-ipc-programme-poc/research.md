@@ -17,11 +17,11 @@ Everything is re-proven by `npm run preflight` (§3) before any demo.
 | T4 | MongoDB single-node replica set, with transactions for state change + ledger + outbox together | Prevents partial writes (Constitution VI). Mongo is part of the MERN choice. | Two-phase writes without transactions (risk of drift). |
 | T5 | Transactional outbox → kafkajs publisher. Consumers dedupe on (topic, key, status) and failures go to a dead-letter collection. | Exactly-once effect over an at-least-once broker. | Direct publish inside the request (lost events on crash). |
 | T6 | cockatiel policies on every ELEVATE call: timeout 5 s, 3 retries with jitter on idempotent calls, circuit breaker 50%/30 s | ELEVATE hangs on unknown routes (V2 A10). Failures stay isolated (NFR-009). | Bare fetch (hangs, cascades). |
-| T7 | Evidence in the programme MinIO; ELEVATE stores only an opaque evidenceId inside the answer or task | ELEVATE file sign/download is broken locally and has access flaws (V1, research-elevate R6). The locker enforces scope. | ELEVATE cloud-services upload (broken; V1 flaw). |
+| T7 | Evidence in the programme SeaweedFS S3; ELEVATE stores only an opaque evidenceId inside the answer or task | ELEVATE file sign/download is broken locally and has access flaws (V1, research-elevate R6). The locker enforces scope. | ELEVATE cloud-services upload (broken; V1 flaw). |
 | T8 | Rate limiting with express-rate-limit and a Mongo store (120/min per user, 20/min per IP on login) | No new product (Constitution XII). Works across restarts. | Redis store (one more dependency per profile). |
 | T9 | Prometheus + Grafana + Alertmanager. prom-client in each service; W3C traceparent is propagated and its trace id is logged as the correlationId. | NFR-003: one dashboard and the 6 alerts in §5. | Full OTel collector + Tempo (more than the POC needs). |
 | T10 | Caddy terminates TLS with local CA certificates | NFR-005, with almost no configuration. | nginx + mkcert (more manual). |
-| T11 | Backup sidecar: `mongodump --oplog` every 15 min and `mc mirror` for MinIO, keeping 7 days of copies | RPO ≤ 15 min (NFR-002). The restore drill script restores into a scratch DB and runs `ledger:verify`. | Volume snapshots (not portable). |
+| T11 | Backup sidecar: `mongodump --oplog` every 15 min and `mc mirror` for SeaweedFS S3, keeping 7 days of copies | RPO ≤ 15 min (NFR-002). The restore drill script restores into a scratch DB and runs `ledger:verify`. | Volume snapshots (not portable). |
 | T12 | migrate-mongo for versioned, reversible migrations, including indexes and the ledger DB role (insert + find only) | NFR-006. The DB role makes "append-only" true at the database. | Index creation at boot (not reversible). |
 | T13 | Releases: GitHub Actions builds images tagged with semver and the git sha. `scripts/rollback.sh <tag>` re-points compose and runs down-migrations if needed. | NFR-006 rollback in under 10 min. | Rebuild on rollback (slow, not reproducible). |
 | T14 | CI split: hosted runners do lint, typecheck, unit, contract, build, Trivy, npm audit, gitleaks and bundle budget. A self-hosted runner does integration, E2E and security against the real ELEVATE. | Principle I forbids mocking ELEVATE. | Docker-in-CI ELEVATE (the stack is too large and needs internet at cold start). |
@@ -31,6 +31,12 @@ Everything is re-proven by `npm run preflight` (§3) before any demo.
 | T18 | Contract testing: ajv against openapi.yaml and the event schemas; types generated with openapi-typescript | Contract-first (Constitution V). | Hand-written types (drift). |
 | T19 | Load: k6 scripts for the role mixes. Release check: 3× pilot concurrency for 15 min. | SC-013. | Artillery (similar; k6 is chosen for thresholds as code). |
 | T20 | Demo clock: an offset in workflow, `programmeNow()` used by every due/overdue/cycle calculation; Playwright clock API on the device side | FR-038. ELEVATE dates are not shifted. | Shortened durations (rejected by the user). |
+
+**T7 update (2026-11-23):** MinIO community images can no longer be pulled anonymously (Docker Hub
+`minio/minio` and quay.io both refused). The evidence store is **SeaweedFS 4.55** (Apache-2.0) in S3 mode.
+Verified locally: bucket versioning Enabled, presigned PUT/GET (SDK checksums `WHEN_REQUIRED`), and
+deleting every object version (patient-data purge). Garage was rejected (AGPL; Constitution requires
+permissive licences). Backups mirror with `aws s3 sync`.
 
 ## 2. ELEVATE integration decisions
 
