@@ -5,9 +5,12 @@ import { ConfigError, createLogger, installGracefulShutdown } from '@ipc/platfor
 import { createApp } from './app.js';
 import { loadWorkflowConfig, type WorkflowConfig } from './config/index.js';
 import { createContext } from './context.js';
+import { AssessmentService } from './services/assessment.service.js';
 import { createConsumers } from './consumers/registry.js';
+import { createPlanRuntime } from './services/plan.runtime.js';
 import { startConsumers } from './consumers/runner.js';
 import { OutboxPublisher } from './services/outbox.publisher.js';
+import { ElevateAdminGateway, UnconfiguredElevateAdmin } from './services/elevate-admin.gateway.js';
 
 const logger = createLogger('workflow');
 
@@ -31,7 +34,14 @@ async function main() {
   await mongoose.connect(cfg.MONGO_URL, { dbName: cfg.MONGO_DB, serverSelectionTimeoutMS: 10_000 });
   logger.info({ db: cfg.MONGO_DB }, 'mongo connected');
 
-  const ctx = createContext({ profile: cfg.IPC_PROFILE, demoMode: cfg.DEMO_MODE });
+  const gateway = ElevateAdminGateway.fromConfig(cfg);
+  if ('missing' in gateway) logger.warn({ missing: gateway.missing }, 'ELEVATE admin settings missing: checklist publish and cycle creation answer 503');
+  const ctx = createContext({
+    profile: cfg.IPC_PROFILE,
+    demoMode: cfg.DEMO_MODE,
+    codePrefix: cfg.IPC_CODE_PREFIX,
+    elevate: 'missing' in gateway ? new UnconfiguredElevateAdmin(gateway.missing) : gateway,
+  });
   await ctx.clock.refresh();
   const clockTimer = setInterval(() => {
     ctx.clock.refresh().catch((err: unknown) => logger.warn({ err }, 'clock refresh failed'));
@@ -51,7 +61,11 @@ async function main() {
   });
   publisher.start(cfg.OUTBOX_POLL_MS);
 
-  const consumers = await startConsumers(kafka, createConsumers({ logger, orgId: cfg.ELEVATE_ORG_ID }), {
+  // US3: plan service + one-way ELEVATE reconciliation (every 5 min and after each transition).
+  const planRt = createPlanRuntime({ cfg, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
+  planRt.reconcile.start();
+
+  const consumers = await startConsumers(kafka, createConsumers({ logger, orgId: cfg.ELEVATE_ORG_ID, ledger: ctx.ledger, plans: planRt.plans }), {
     groupId: cfg.IPC_CONSUMER_GROUP,
     logger,
   });
@@ -66,6 +80,9 @@ async function main() {
     dependencies: {},
     ledger: ctx.ledger,
     scope: ctx.scope,
+    admin: { admin: ctx.admin, catalogue: ctx.catalogue, clock: ctx.clock },
+    assessment: new AssessmentService({ ledger: ctx.ledger }),
+    plans: planRt.plans,
   });
 
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
@@ -79,6 +96,7 @@ async function main() {
     stopWorkers: async () => {
       clearInterval(clockTimer);
       await consumers.stop();
+      await planRt.reconcile.stop();
       await publisher.stop();
       await Promise.allSettled([producer.disconnect(), admin.disconnect()]);
     },

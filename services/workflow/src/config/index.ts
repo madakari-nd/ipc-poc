@@ -37,6 +37,27 @@ export const workflowConfigSchema = z
     KAFKA_CLIENT_ID: z.string().min(1).default('ipc-workflow'),
     OUTBOX_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(1000),
     OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(20),
+    // ---- ELEVATE admin calls (US1: checklist publish E5/E19, cycle plan solutions FR-018a). Optional:
+    // without them those operations answer 503 ELEVATE_UNAVAILABLE naming the missing setting.
+    ELEVATE_USER_URL: z.string().url().optional(),
+    ELEVATE_ENTITY_URL: z.string().url().optional(),
+    ELEVATE_SAMIKSHA_URL: z.string().url().optional(),
+    ELEVATE_PROJECT_URL: z.string().url().optional(),
+    ELEVATE_INTERNAL_ACCESS_TOKEN: z.string().min(1).optional(),
+    /** entity-management ADMIN_ACCESS_TOKEN (E15): entity writes carry the admin header set. */
+    ELEVATE_ADMIN_TOKEN_ENTITY: z.string().min(1).optional(),
+    ELEVATE_TENANT_CODE: z.string().min(1).default('default'),
+    ELEVATE_ORIGIN: z.string().url().default('http://localhost'),
+    /** ELEVATE organisation code used for solution copies (E18, e.g. default_code). */
+    ELEVATE_ORG_CODE: z.string().min(1).max(64).default('default_code'),
+    ELEVATE_ORG_ADMIN_EMAIL: z.string().min(1).optional(),
+    ELEVATE_ORG_ADMIN_PASSWORD: z.string().min(1).optional(),
+    /** Code prefix of this profile's ELEVATE records (E16). */
+    IPC_CODE_PREFIX: z.string().max(16).default(''),
+    /** Samiksha solution (_id) checklist v1 is copied from when a draft has no solution yet. */
+    IPC_CHECKLIST_TEMPLATE_SOLUTION_ID: z.string().regex(/^[a-f0-9]{24}$/).optional(),
+    /** Reusable project template (externalId) copied into each new cycle's plan solution. */
+    IPC_PLAN_TEMPLATE_EXTERNAL_ID: z.string().min(1).max(128).optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   })
   .refine((c) => !(c.DEMO_MODE && c.IPC_PROFILE === 'prod'), {

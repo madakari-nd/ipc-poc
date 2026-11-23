@@ -69,6 +69,8 @@ export const CycleModel = modelFor<Cycle>('Cycle', defineSchema('cycles', {
 // ---- ScopeAssignment (§1)
 export interface ScopeAssignmentDoc extends Meta {
   userId: string; role: Role; scope: Scope; validFrom: Date; validTo?: Date | null; source: 'hr_import' | 'admin';
+  /** Display name for the people picker (listUsers); ELEVATE stays the system of record for users. */
+  userName?: string;
 }
 const oidString = { type: String, match: OBJECT_ID_RE, maxlength: 24 };
 const scopeSchema = new Schema(
@@ -88,6 +90,7 @@ export const ScopeAssignmentModel = modelFor<ScopeAssignmentDoc>('ScopeAssignmen
   validFrom: { type: Date, required: true },
   validTo: { type: Date, default: null },
   source: text({ required: true, enum: ['hr_import', 'admin'] }),
+  userName: text({ max: 200 }),
 }));
 
 export { localizedText };

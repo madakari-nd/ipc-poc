@@ -11,13 +11,36 @@ export const TASK_STATES = [
 export type TaskState = (typeof TASK_STATES)[number];
 
 // ---- Plan (§4)
+/**
+ * A task proposed by the draft (contract `DraftTask`). Draft tasks live on the draft plan until
+ * approval, which turns every included one into a Task (an owner is required only then).
+ */
+export interface DraftTaskDoc {
+  taskKey: string; title: { en: string; hi?: string; kn?: string }; sourceQuestionKey?: string; riskLevel: RiskLevel;
+  ownerUserId?: string; dueAt: Date; dependsOnTaskKeys: string[];
+  evidenceRule: { photoRequired: boolean; minPhotos: number }; secondValidation: boolean; included: boolean;
+}
 export interface Plan extends Meta {
   wardId: Types.ObjectId; cycleId: Types.ObjectId; sourceAssessmentId: Types.ObjectId;
   status: 'draft' | 'active' | 'closed'; elevateProjectId?: string; planTemplateVersion?: number; revision: number;
   goals: { key: string; text: string }[]; milestones: { key: string; text: string; dueAt?: Date }[];
   carriedOverTaskIds: Types.ObjectId[]; approvedBy?: string; approvedAt?: Date;
+  draftTasks?: DraftTaskDoc[];
 }
+const draftTaskSchema = new Schema({
+  taskKey: text({ required: true, max: 64 }),
+  title: { type: localizedText, required: true },
+  sourceQuestionKey: text({ max: 64 }),
+  riskLevel: text({ required: true, enum: RISK_LEVELS }),
+  ownerUserId: elevateId(),
+  dueAt: { type: Date, required: true },
+  dependsOnTaskKeys: [text({ max: 64 })],
+  evidenceRule: { type: evidenceRuleSchema, required: true },
+  secondValidation: { type: Boolean, default: false },
+  included: { type: Boolean, default: true },
+}, { _id: false, strict: 'throw' });
 export const PlanModel = modelFor<Plan>('Plan', defineSchema('plans', {
+  draftTasks: { type: [draftTaskSchema], default: undefined },
   wardId: ref(true),
   cycleId: ref(true),
   sourceAssessmentId: ref(true),

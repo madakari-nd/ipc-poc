@@ -685,6 +685,15 @@ paths:
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: {type: string, maxLength: 500, description: Publish note recorded in the audit ledger.}
       responses:
         '200':
           description: Published version.

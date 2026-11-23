@@ -9,17 +9,17 @@ import { Problem } from '@ipc/platform';
  * `sub` = calling service, `exp`/`iat` required, lifetime ≤ 5 min. Optional `act` (RFC 8693) carries
  * the acting user: { sub: <ELEVATE user id>, role: <programme role> }.
  */
-export const actClaim = z
-  .object({
-    sub: z.string().min(1).max(64),
-    role: z.enum(['STATE_ADMIN', 'DISTRICT_QM', 'IPC_OFFICER', 'WARD_SUPERVISOR', 'FRONTLINE', 'MENTOR', 'EXTERNAL_AUDITOR', 'SYSTEM']),
-  })
-  .strict();
+const actRole = z.enum(['STATE_ADMIN', 'DISTRICT_QM', 'IPC_OFFICER', 'WARD_SUPERVISOR', 'FRONTLINE', 'MENTOR', 'EXTERNAL_AUDITOR', 'SYSTEM']);
+/** `{sub, role}` (RFC 8693) or the Edge signer's `{userId, role}`, normalised to `{sub, role}`. */
+export const actClaim = z.union([
+  z.object({ sub: z.string().min(1).max(64), role: actRole }).strict(),
+  z.object({ userId: z.string().min(1).max(64), role: actRole }).strict().transform((a) => ({ sub: a.userId, role: a.role })),
+]);
 
 export interface ServiceIdentity {
   sub: string;
   iss: string;
-  act?: z.infer<typeof actClaim>;
+  act?: z.output<typeof actClaim>;
 }
 
 export interface ServiceJwtOptions {

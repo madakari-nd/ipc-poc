@@ -23,7 +23,7 @@ export type SignedOutReason = 'expired' | 'logged_out' | 'session_ended' | 'unlo
 
 export type SessionState =
   | { status: 'signed_out'; reason?: SignedOutReason }
-  | { status: 'signed_in'; me: Me; offline: boolean; guard: GuardState; outbox: Outbox; db: FieldDb };
+  | { status: 'signed_in'; me: Me; offline: boolean; guard: GuardState; outbox: Outbox; db: FieldDb; /** Offline store key (drafts are kept encrypted, US2). */ key: CryptoKey };
 
 interface SessionApi {
   query: UseQueryResult<SessionState>;
@@ -60,6 +60,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       offline,
       guard,
       db: dbRef.current,
+      key,
       outbox: new Outbox({ db: dbRef.current, key, transport: httpTransport, deviceId: deviceId(), appVersion: '0.1.0' }),
     }),
     [],

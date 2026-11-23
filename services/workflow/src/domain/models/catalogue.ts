@@ -16,13 +16,24 @@ export const evidenceRuleSchema = new Schema(
 export interface ChecklistVersion extends Meta {
   checklistCode: string; version: number; status: 'draft' | 'published' | 'retired';
   elevateSolutionId?: string; elevateObservationTemplateId?: string; publishedAt?: Date; graceUntil?: Date;
-  contentHash?: string; planTemplate?: { elevateTemplateId?: string; version?: number };
+  contentHash?: string;
+  planTemplate?: { elevateTemplateId?: string; version?: number; tasks?: { templateTaskKey: string; title: Record<string, string>; description?: Record<string, string> }[] };
+  /** Published version this draft was copied from (its ELEVATE solution is the copy source, E5). */
+  basedOnVersionId?: Types.ObjectId;
+  elevateSolutionExternalId?: string;
   sections: { sectionKey: string; title: Record<string, string>; wardTypes: string[] }[];
   questions: {
-    questionKey: string; elevateQuestionExternalId?: string; sectionKey: string; textHash: string;
+    questionKey: string; elevateQuestionExternalId?: string; sectionKey: string; textHash?: string;
+    text?: Record<string, string>; answerType?: 'score' | 'yes_no' | 'single_choice';
+    options?: { value: string; label: Record<string, string>; score: number }[];
     riskLevel: RiskLevel; passMark: number; maxScore: number; templateTaskKey?: string;
   }[];
 }
+const planTemplateTaskSchema = new Schema({
+  templateTaskKey: text({ required: true, max: 40 }),
+  title: { type: localizedText, required: true },
+  description: { type: localizedText },
+}, { _id: false, strict: 'throw' });
 export const ChecklistVersionModel = modelFor<ChecklistVersion>('ChecklistVersion', defineSchema('checklist_versions', {
   checklistCode: text({ required: true, max: 32 }),
   version: { type: Number, required: true, min: 1 },
@@ -32,7 +43,9 @@ export const ChecklistVersionModel = modelFor<ChecklistVersion>('ChecklistVersio
   publishedAt: Date,
   graceUntil: Date,
   contentHash: sha256,
-  planTemplate: { elevateTemplateId: elevateId(), version: { type: Number, min: 1 } },
+  planTemplate: { elevateTemplateId: elevateId(), version: { type: Number, min: 1 }, tasks: { type: [planTemplateTaskSchema], default: undefined } },
+  basedOnVersionId: { type: Schema.Types.ObjectId },
+  elevateSolutionExternalId: text({ max: 128 }),
   sections: [new Schema({
     sectionKey: text({ required: true, max: 64 }),
     title: { type: localizedText, required: true },
@@ -42,7 +55,14 @@ export const ChecklistVersionModel = modelFor<ChecklistVersion>('ChecklistVersio
     questionKey: text({ required: true, max: 64 }),
     elevateQuestionExternalId: elevateId(),
     sectionKey: text({ required: true, max: 64 }),
-    textHash: { ...sha256, required: true },
+    // required once published (the catalogue service stamps it); a draft may carry text only
+    textHash: sha256,
+    text: { type: localizedText },
+    answerType: text({ enum: ['score', 'yes_no', 'single_choice'] }),
+    options: {
+      type: [new Schema({ value: text({ required: true, max: 32 }), label: { type: localizedText, required: true }, score: { type: Number, required: true } }, { _id: false, strict: 'throw' })],
+      default: undefined,
+    },
     riskLevel: text({ required: true, enum: RISK_LEVELS }),
     passMark: { type: Number, required: true, min: 0 },
     maxScore: { type: Number, required: true, min: 0 },

@@ -158,5 +158,83 @@
     "VERIFIED": "Verified",
     "PENDING_VALIDATION": "Waiting for validation",
     "CLOSED": "Closed"
+  },
+  "assessment": {
+    "list": {
+      "title": "Ward assessments",
+      "description": "Download a ward while online, then complete it offline. It is sent when the network returns.",
+      "empty": {
+        "title": "No wards to assess",
+        "description": "There is no open cycle or no ward in your area. Ask your district quality manager."
+      },
+      "downloaded": "{{ward}} is ready to use offline.",
+      "downloadFailed": "The ward could not be downloaded. Try again when online.",
+      "problemCode": "Reason: {{code}}",
+      "notStarted": "Not started",
+      "local": {
+        "editing": "Saved on this phone",
+        "queued": "Waiting to be sent",
+        "read_only": "Read-only: start again on the new version"
+      },
+      "server": {
+        "draft": "Started",
+        "submitted": "Sent",
+        "completed": "Completed"
+      },
+      "columns": {
+        "ward": "Ward",
+        "status": "Status",
+        "action": "Next step"
+      },
+      "open": "Open",
+      "openWard": "Open the assessment of {{ward}}",
+      "download": "Download for offline",
+      "downloadWard": "Download {{ward}} for offline use",
+      "offlineOnlyDownloads": "You are offline. Only the wards on this phone are shown."
+    },
+    "form": {
+      "title": "Ward assessment",
+      "backToList": "Back to wards",
+      "notDownloaded": {
+        "title": "This assessment is not on this phone",
+        "description": "Open the ward list while online and download the ward."
+      },
+      "answer": "Answer",
+      "meets": "Meets standard",
+      "doesNotMeet": "Does not meet",
+      "score": "Score (0 to {{max}})",
+      "observation": "Observation",
+      "noPatientText": "Do not write patient names or details.",
+      "notes": "Notes for the whole ward",
+      "photos": "Photos",
+      "photoN": "Photo {{n}}",
+      "gpsShort": "GPS {{lat}}, {{lng}}",
+      "removePhoto": "Remove photo",
+      "addPhoto": "Add photo",
+      "addPhotoFor": "Add a photo for: {{question}}",
+      "closeCamera": "Close camera",
+      "finish": "Finish and send",
+      "declaration": "I confirm that no patient can be identified in this assessment, its notes or its photos.",
+      "fixProblems_one": "Fix {{count}} item above before sending.",
+      "fixProblems_other": "Fix {{count}} items above before sending.",
+      "submit": "Submit assessment",
+      "queued": "Assessment queued. Sending now.",
+      "queuedOffline": "Assessment saved. It will be sent when you are online.",
+      "queuedInfo": "This assessment is queued. Photos are sent first, then the assessment.",
+      "grace": "A newer checklist was published. This version can still be sent until {{date}}.",
+      "retired": "This checklist version was replaced more than 7 days ago. Your draft is kept read-only. Start again on the new version."
+    },
+    "status": {
+      "title": "Sending",
+      "photo": "Photo",
+      "record": "Assessment"
+    },
+    "problem": {
+      "declaration_required": "Confirm the no-patient-data declaration",
+      "too_long": "Use at most {{max}} characters.",
+      "unanswered": "Answer this question.",
+      "version_retired": "This checklist version can no longer be sent.",
+      "read_only": "This draft is read-only."
+    }
   }
 }

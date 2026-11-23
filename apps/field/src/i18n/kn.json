@@ -11,5 +11,35 @@
   "state": { "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…", "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" },
   "auth": { "title": "ಸೈನ್ ಇನ್", "password": "ಪಾಸ್‌ವರ್ಡ್", "submit": "ಸೈನ್ ಇನ್" },
   "queue": { "status": { "pending": "ಬಾಕಿ", "sent": "ಕಳುಹಿಸಲಾಗಿದೆ", "needs_attention": "ಗಮನ ಬೇಕು" } },
-  "risk": { "critical": "ಗಂಭೀರ", "high": "ಹೆಚ್ಚು", "normal": "ಸಾಮಾನ್ಯ" }
+  "risk": { "critical": "ಗಂಭೀರ", "high": "ಹೆಚ್ಚು", "normal": "ಸಾಮಾನ್ಯ" },
+  "assessment": {
+    "list": {
+      "title": "ವಾರ್ಡ್ ಮೌಲ್ಯಮಾಪನ",
+      "download": "ಆಫ್‌ಲೈನ್‌ಗಾಗಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+      "open": "ತೆರೆಯಿರಿ",
+      "notStarted": "ಪ್ರಾರಂಭವಾಗಿಲ್ಲ",
+      "columns": {
+        "ward": "ವಾರ್ಡ್",
+        "status": "ಸ್ಥಿತಿ",
+        "action": "ಮುಂದಿನ ಹಂತ"
+      }
+    },
+    "form": {
+      "title": "ವಾರ್ಡ್ ಮೌಲ್ಯಮಾಪನ",
+      "meets": "ಮಾನದಂಡ ಪೂರೈಸುತ್ತದೆ",
+      "doesNotMeet": "ಮಾನದಂಡ ಪೂರೈಸುವುದಿಲ್ಲ",
+      "observation": "ವೀಕ್ಷಣೆ",
+      "addPhoto": "ಫೋಟೋ ಸೇರಿಸಿ",
+      "submit": "ಮೌಲ್ಯಮಾಪನ ಸಲ್ಲಿಸಿ",
+      "notes": "ಇಡೀ ವಾರ್ಡ್‌ಗೆ ಟಿಪ್ಪಣಿಗಳು"
+    },
+    "status": {
+      "photo": "ಫೋಟೋ",
+      "record": "ಮೌಲ್ಯಮಾಪನ"
+    },
+    "problem": {
+      "declaration_required": "ರೋಗಿಯ ಮಾಹಿತಿ ಇಲ್ಲ ಎಂಬ ಘೋಷಣೆಯನ್ನು ದೃಢೀಕರಿಸಿ",
+      "unanswered": "ಈ ಪ್ರಶ್ನೆಗೆ ಉತ್ತರಿಸಿ."
+    }
+  }
 }

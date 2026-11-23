@@ -15,6 +15,10 @@ export interface InternalRouterDeps {
   health: RequestHandler;
   ledger: LedgerService;
   scope: ScopeService;
+  /** US1: importer writes (`/internal/register/*`), mounted when the admin service is wired. */
+  register?: Router;
+  /** US2: `internalUpsertAssessmentContext` (PUT /internal/assessments/{elevateSubmissionId}/context). */
+  assessmentContext?: Router;
 }
 
 /**
@@ -28,5 +32,7 @@ export function internalRouter(d: InternalRouterDeps): Router {
   r.get('/dependencies', d.health);
   r.use(ledgerRoutes(new LedgerController(d.ledger), internalIdempotency({ logger: d.logger })));
   r.use(scopeRoutes(new ScopeController(d.scope)));
+  if (d.register) r.use(d.register);
+  if (d.assessmentContext) r.use(d.assessmentContext);
   return r;
 }

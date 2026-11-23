@@ -203,19 +203,19 @@ its own once Phase 2 is done.
 
 **Independent Test**: import from empty, publish v2, and v1 assessments still render with their own questions.
 
-- [ ] T067 [P] [US1] Write unit tests `services/workflow/tests/domain/catalogue.test.ts`. Published versions are immutable; v(n+1) retires v(n) with a 7-day grace period; the question key map holds across copies; the content hash is stable
-- [ ] T068 [P] [US1] Write `tests/integration/setup.int.test.ts`. Facility and HR import create ELEVATE entities and users, and leavers are deactivated
-- [ ] T069 [P] [US1] Write the facility importer in `services/adapters/src/importers/facility.importer.ts`. It parses the CSV, upserts entities by facility code with bulkCreate plus mappingUpload, stores the location in metadata, and reports job status
-- [ ] T070 [P] [US1] Write the HR importer in `services/adapters/src/importers/hr.importer.ts`:
+- [X] T067 [P] [US1] Write unit tests `services/workflow/tests/domain/catalogue.test.ts`. Published versions are immutable; v(n+1) retires v(n) with a 7-day grace period; the question key map holds across copies; the content hash is stable
+- [X] T068 [P] [US1] Write `tests/integration/setup.int.test.ts`. Facility and HR import create ELEVATE entities and users, and leavers are deactivated
+- [X] T069 [P] [US1] Write the facility importer in `services/adapters/src/importers/facility.importer.ts`. It parses the CSV, upserts entities by facility code with bulkCreate plus mappingUpload, stores the location in metadata, and reports job status
+- [X] T070 [P] [US1] Write the HR importer in `services/adapters/src/importers/hr.importer.ts`:
   - creates users one at a time with account/create and assignRole (research E2)
   - uses the mentoring role request and approve flow for mentors (E3)
   - deactivates leavers and ends their scopes
   - puts the leavers' open tasks into "needs reassignment"
-- [ ] T071 [US1] Write `services/workflow/src/domain/catalogue.ts` and `services/catalogue.service.ts`. They hold drafts, publish v1 from a template, and publish v(n+1) through samiksha importFromSolution, keeping the question-key map (E5). They emit `ipc.checklist.published` and write the ledger
-- [ ] T072 [US1] Write `services/workflow/src/routes/admin.routes.ts` for programme, cycles (with one plan solution per cycle, FR-018a), scope assignments, risk defaults, escalation rules and the demo clock. The edge exposes them for the state admin only
-- [ ] T073 [US1] Add a guard in `services/edge/src/proxy/elevate.proxy.ts` that refuses any samiksha solution or question edit for published versions with 409 `CHECKLIST_PUBLISHED` and records it in the ledger through `internalAppendLedger`
-- [ ] T074 [P] [US1] Build `apps/officer/src/features/admin/` with these screens: Imports (upload and job status), Users and scopes, Cycles, Checklists (versions, publish, grace), Risk defaults, Escalation rules, Demo clock (with a banner)
-- [ ] T075 [US1] Write the E2E test `tests/e2e/us1-setup.spec.ts`: publish v2, and the v1 baseline still opens with v1 questions. It includes an axe check
+- [X] T071 [US1] Write `services/workflow/src/domain/catalogue.ts` and `services/catalogue.service.ts`. They hold drafts, publish v1 from a template, and publish v(n+1) through samiksha importFromSolution, keeping the question-key map (E5). They emit `ipc.checklist.published` and write the ledger
+- [X] T072 [US1] Write `services/workflow/src/routes/admin.routes.ts` for programme, cycles (with one plan solution per cycle, FR-018a), scope assignments, risk defaults, escalation rules and the demo clock. The edge exposes them for the state admin only
+- [X] T073 [US1] Add a guard in `services/edge/src/proxy/elevate.proxy.ts` that refuses any samiksha solution or question edit for published versions with 409 `CHECKLIST_PUBLISHED` and records it in the ledger through `internalAppendLedger`
+- [X] T074 [P] [US1] Build `apps/officer/src/features/admin/` with these screens: Imports (upload and job status), Users and scopes, Cycles, Checklists (versions, publish, grace), Risk defaults, Escalation rules, Demo clock (with a banner)
+- [X] T075 [US1] Write the E2E test `tests/e2e/us1-setup.spec.ts`: publish v2, and the v1 baseline still opens with v1 questions. It includes an axe check
 
 ---
 
@@ -225,17 +225,17 @@ its own once Phase 2 is done.
 
 **Independent Test**: complete Ward 4 in airplane mode with 3 photos, reconnect, and find 1 completed submission and 3 confirmed photos.
 
-- [ ] T076 [P] [US2] Write unit tests `apps/field/tests/assessment-draft.test.ts` covering the declaration requirement, the 500-character limit, version grace (submit on v1 within 7 days, read-only after) and the ordering of the outbox items
-- [ ] T077 [P] [US2] Write `tests/integration/assessment.int.test.ts`. The edge submission calls samiksha observationSubmissions/update with the user's token, and a duplicate key replays the stored response
-- [ ] T078 [US2] Write `services/edge/src/routes/assessments.routes.ts`:
+- [X] T076 [P] [US2] Write unit tests `apps/field/tests/assessment-draft.test.ts` covering the declaration requirement, the 500-character limit, version grace (submit on v1 within 7 days, read-only after) and the ordering of the outbox items
+- [X] T077 [P] [US2] Write `tests/integration/assessment.int.test.ts`. The edge submission calls samiksha observationSubmissions/update with the user's token, and a duplicate key replays the stored response
+- [X] T078 [US2] Write `services/edge/src/routes/assessments.routes.ts`:
   - list the assigned wards and their form bundle (version and hash)
   - `POST /ipc/v1/assessments` (`startAssessment`), called online when a ward is downloaded: creates the observation per ward with `data.entities` (E6) and returns the assessment id and form bundle
   - submit: check the declaration, check that every referenced evidenceId is confirmed, then call samiksha
   - store the AssessmentContext through workflow `internalUpsertAssessmentContext`, with cycle, assessor type and baseline flag
   - `setAssessmentBaseline` lets the officer change the baseline link with a reason (FR-010 edge case)
-- [ ] T079 [US2] Write `services/workflow/src/services/assessment.service.ts`. It records the AssessmentContext, sets `isBaselineForCycle` and the `baselineOfId` link, and sets the release state to "held" for external assessors. It also serves `internalUpsertAssessmentContext` from `routes/internal/assessment-context.routes.ts`: an idempotent upsert on `elevateSubmissionId` whose status only moves forward.
-- [ ] T080 [US2] Build `apps/field/src/features/assessment/`: WardList, download for offline, a sectioned Form for the ward type, Notes and observations, PhotoCapture per question, the Declaration, a Submit queued to the outbox, and per-item outbox status
-- [ ] T081 [US2] Write the E2E test `tests/e2e/us2-offline-assessment.spec.ts`:
+- [X] T079 [US2] Write `services/workflow/src/services/assessment.service.ts`. It records the AssessmentContext, sets `isBaselineForCycle` and the `baselineOfId` link, and sets the release state to "held" for external assessors. It also serves `internalUpsertAssessmentContext` from `routes/internal/assessment-context.routes.ts`: an idempotent upsert on `elevateSubmissionId` whose status only moves forward.
+- [X] T080 [US2] Build `apps/field/src/features/assessment/`: WardList, download for offline, a sectioned Form for the ward type, Notes and observations, PhotoCapture per question, the Declaration, a Submit queued to the outbox, and per-item outbox status
+- [ ] T081 [US2] Write the E2E test `tests/e2e/us2-offline-assessment.spec.ts`: (WRITTEN; not yet run: needs the full stack incl. S3 — run in the MVP check)
   - go offline and complete with 3 photos, then come online
   - interrupt the upload and resume
   - assert no duplicates and that the photo hashes match, repeated 10 times (`--repeat-each=10`)
@@ -250,22 +250,22 @@ its own once Phase 2 is done.
 
 **Independent Test**: a seeded assessment with 1 critical finding shows a draft in under 60 s; after approval the ELEVATE project exists along with the governance records.
 
-- [ ] T082 [P] [US3] Write unit tests `services/workflow/tests/domain/plan-draft.test.ts`:
+- [X] T082 [P] [US3] Write unit tests `services/workflow/tests/domain/plan-draft.test.ts`:
   - failed questions map to template tasks with risk defaults
   - no failures gives no plan
   - a second assessment in the same cycle gives no plan
   - a repeat cycle gives a new draft with carried-over links
   - revision numbering
-- [ ] T083 [P] [US3] Write `tests/integration/plan.int.test.ts`: importFromLibrary as the ward service account with the cycle solution, then sync so the task set matches (E9), then reconciliation
-- [ ] T084 [US3] Write `services/workflow/src/consumers/observation-completed.consumer.ts`. It consumes `elevate_observations_<env>` with status completed, reads the scores from the event (falling back to catalogue scoring, E8), builds the DraftPlan with the ledger entry, and dedupes
-- [ ] T085 [US3] Write `services/workflow/src/domain/plan.ts` and `services/plan.service.ts`:
+- [X] T083 [P] [US3] Write `tests/integration/plan.int.test.ts`: importFromLibrary as the ward service account with the cycle solution, then sync so the task set matches (E9), then reconciliation
+- [X] T084 [US3] Write `services/workflow/src/consumers/observation-completed.consumer.ts`. It consumes `elevate_observations_<env>` with status completed, reads the scores from the event (falling back to catalogue scoring, E8), builds the DraftPlan with the ledger entry, and dedupes
+- [X] T085 [US3] Write `services/workflow/src/domain/plan.ts` and `services/plan.service.ts`:
   - edit the draft: owners, goals, milestones, dependencies
   - approve: ELEVATE importFromLibrary plus sync, then the tasks with revision r1, then `ipc.plan.created` and `ipc.task.assigned`
   - revise an active plan, which creates a PlanRevision (FR-017)
-- [ ] T086 [US3] Write `services/workflow/src/jobs/reconcile.job.ts`. It runs one way (workflow → project-service) every 5 minutes and after each transition, and records every correction in the ledger as `reconcile.corrected` (FR-019)
-- [ ] T087 [US3] Write `services/edge/src/routes/plans.routes.ts`: the draft queue, get, edit the draft (with If-Match), approve, revisions and revise. All are scoped to the officer's facility
-- [ ] T088 [US3] Build `apps/officer/src/features/plans/`: the DraftQueue, PlanEditor (owners, dependencies, goals, milestones), an approve dialog, plan history and revisions, the "No actions needed" state, and the carried-over tasks list
-- [ ] T089 [US3] Write the E2E test `tests/e2e/us3-plan.spec.ts`. It times completion → draft visible at under 60 s, ten times (SC-004), then approves and finds the ELEVATE project. It includes an axe check
+- [X] T086 [US3] Write `services/workflow/src/jobs/reconcile.job.ts`. It runs one way (workflow → project-service) every 5 minutes and after each transition, and records every correction in the ledger as `reconcile.corrected` (FR-019)
+- [X] T087 [US3] Write `services/edge/src/routes/plans.routes.ts`: the draft queue, get, edit the draft (with If-Match), approve, revisions and revise. All are scoped to the officer's facility
+- [X] T088 [US3] Build `apps/officer/src/features/plans/`: the DraftQueue, PlanEditor (owners, dependencies, goals, milestones), an approve dialog, plan history and revisions, the "No actions needed" state, and the carried-over tasks list
+- [X] T089 [US3] Write the E2E test `tests/e2e/us3-plan.spec.ts`. It times completion → draft visible at under 60 s, ten times (SC-004), then approves and finds the ELEVATE project. It includes an axe check
 
 ---
 

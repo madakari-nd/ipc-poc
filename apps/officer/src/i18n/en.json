@@ -1,6 +1,13 @@
 {
-  "app": { "name": "IPC Programme", "skipToContent": "Skip to main content" },
-  "common": { "close": "Close", "dismiss": "Dismiss", "cancel": "Cancel" },
+  "app": {
+    "name": "IPC Programme",
+    "skipToContent": "Skip to main content"
+  },
+  "common": {
+    "close": "Close",
+    "dismiss": "Dismiss",
+    "cancel": "Cancel"
+  },
   "nav": {
     "label": "Main menu",
     "home": "Home",
@@ -22,10 +29,22 @@
   "state": {
     "loading": "Loading…",
     "retry": "Try again",
-    "empty": { "title": "Nothing here yet", "description": "There is nothing to show right now." },
-    "error": { "title": "Something went wrong", "description": "We could not load this. Try again. If it keeps happening, contact the programme team." },
-    "offline": { "title": "You are offline", "description": "Check your internet connection and try again." },
-    "denied": { "title": "You cannot open this", "description": "Your role does not include this area. Go back to Home." }
+    "empty": {
+      "title": "Nothing here yet",
+      "description": "There is nothing to show right now."
+    },
+    "error": {
+      "title": "Something went wrong",
+      "description": "We could not load this. Try again. If it keeps happening, contact the programme team."
+    },
+    "offline": {
+      "title": "You are offline",
+      "description": "Check your internet connection and try again."
+    },
+    "denied": {
+      "title": "You cannot open this",
+      "description": "Your role does not include this area. Go back to Home."
+    }
   },
   "roles": {
     "STATE_ADMIN": "State administrator",
@@ -57,7 +76,10 @@
     "title": "What needs you now",
     "open": "Open",
     "due": "Due {{date}}",
-    "nothing": { "title": "Nothing needs you right now", "description": "New work will show up here." },
+    "nothing": {
+      "title": "Nothing needs you right now",
+      "description": "New work will show up here."
+    },
     "intro": {
       "STATE_ADMIN": "Programme setup, oversight and audit across the state.",
       "DISTRICT_QM": "Hospitals in your district: validations, escalations and progress.",
@@ -87,10 +109,20 @@
   },
   "section": {
     "backHome": "Back to home",
-    "comingSoon": { "title": "This area is not ready yet", "description": "It will be added soon. Use Home for your current work." }
+    "comingSoon": {
+      "title": "This area is not ready yet",
+      "description": "It will be added soon. Use Home for your current work."
+    }
   },
-  "notFound": { "title": "Page not found", "description": "This page does not exist. Go back to Home." },
-  "risk": { "critical": "Critical", "high": "High", "normal": "Normal" },
+  "notFound": {
+    "title": "Page not found",
+    "description": "This page does not exist. Go back to Home."
+  },
+  "risk": {
+    "critical": "Critical",
+    "high": "High",
+    "normal": "Normal"
+  },
   "taskState": {
     "ASSIGNED": "Assigned",
     "IN_PROGRESS": "In progress",
@@ -100,7 +132,11 @@
     "PENDING_VALIDATION": "Waiting for validation",
     "CLOSED": "Closed"
   },
-  "legend": { "reused": "ELEVATE reused", "customised": "ELEVATE customised", "built-on-top": "Built on top" },
+  "legend": {
+    "reused": "ELEVATE reused",
+    "customised": "ELEVATE customised",
+    "built-on-top": "Built on top"
+  },
   "style": {
     "title": "Design system",
     "description": "Tokens and components shared by the field app and the officer website.",
@@ -114,8 +150,18 @@
       "values": "Text / background",
       "contrast": "Contrast"
     },
-    "chips": { "title": "Status, risk and legend chips", "note": "Status is never shown by colour alone: each chip has a text label and an icon." },
-    "buttons": { "title": "Buttons", "primary": "Save", "secondary": "Cancel", "danger": "Return task", "ghost": "More", "busy": "Saving" },
+    "chips": {
+      "title": "Status, risk and legend chips",
+      "note": "Status is never shown by colour alone: each chip has a text label and an icon."
+    },
+    "buttons": {
+      "title": "Buttons",
+      "primary": "Save",
+      "secondary": "Cancel",
+      "danger": "Return task",
+      "ghost": "More",
+      "busy": "Saving"
+    },
     "forms": {
       "title": "Form fields",
       "note": "Note",
@@ -125,17 +171,35 @@
       "reason": "Reason",
       "choose": "Choose a reason"
     },
-    "dialog": { "title": "Confirm with a reason", "note": "Irreversible actions (return, validate, close, escalate) ask for confirmation and a reason." },
-    "toast": { "title": "Messages (toasts)", "success": "Show success", "error": "Show error" },
+    "dialog": {
+      "title": "Confirm with a reason",
+      "note": "Irreversible actions (return, validate, close, escalate) ask for confirmation and a reason."
+    },
+    "toast": {
+      "title": "Messages (toasts)",
+      "success": "Show success",
+      "error": "Show error"
+    },
     "boundary": {
       "title": "Screen states",
       "note": "Every screen shows loading, empty, error, offline and no-permission states with a next step.",
       "pick": "State to show",
       "content": "The screen content appears here when it is ready.",
-      "states": { "loading": "Loading", "empty": "Empty", "error": "Error", "offline": "Offline", "denied": "No permission", "ready": "Ready" }
+      "states": {
+        "loading": "Loading",
+        "empty": "Empty",
+        "error": "Error",
+        "offline": "Offline",
+        "denied": "No permission",
+        "ready": "Ready"
+      }
     },
-    "empty": { "title": "Empty state" },
-    "scale": { "title": "Spacing and type scale" },
+    "empty": {
+      "title": "Empty state"
+    },
+    "scale": {
+      "title": "Spacing and type scale"
+    },
     "demo": {
       "returnTask": "Return task",
       "returnDescription": "The task goes back to its owner with your reason.",
@@ -143,6 +207,420 @@
       "reasonMissing": "Evidence is missing",
       "reasonRequired": "Choose a reason.",
       "done": "Done."
+    }
+  },
+  "history": {
+    "title": "History",
+    "intro": "Every recorded change to this {{type}}, oldest first.",
+    "listLabel": "Changes, oldest first",
+    "seq": "Record {{seq}}",
+    "who": "Who",
+    "when": "When",
+    "programmeTime": "(programme time {{time}})",
+    "reason": "Reason",
+    "noReason": "No reason recorded",
+    "fingerprints": "Evidence fingerprints",
+    "before": "Before",
+    "after": "After",
+    "recordHash": "Record",
+    "noFingerprint": "No evidence attached",
+    "more": "Show older changes",
+    "system": "System",
+    "empty": {
+      "title": "No changes recorded yet",
+      "description": "Changes appear here as soon as someone acts on this item."
+    },
+    "subjects": {
+      "programme": "programme",
+      "facility": "hospital",
+      "ward": "ward",
+      "cycle": "cycle",
+      "scope_assignment": "access assignment",
+      "checklist_version": "checklist version",
+      "risk_default": "risk default",
+      "escalation_rule": "escalation rule",
+      "assessment": "assessment",
+      "evidence": "evidence item",
+      "plan": "improvement plan",
+      "task": "task",
+      "escalation": "escalation",
+      "support_request": "support request",
+      "clock": "demo clock",
+      "import_job": "import",
+      "retention_policy": "retention policy"
+    },
+    "actions": {
+      "task_started": "Started",
+      "task_evidence_submitted": "Evidence submitted",
+      "task_returned": "Returned for changes",
+      "task_accepted": "Accepted",
+      "task_validated": "Validated",
+      "task_reassigned": "Reassigned",
+      "task_escalated": "Escalated",
+      "task_reopened": "Reopened",
+      "evidence_confirmed": "Evidence confirmed",
+      "evidence_denied": "Evidence access refused",
+      "evidence_patient_data_deleted": "Media with patient data deleted",
+      "scope_changed": "Access changed",
+      "scope_denied": "Access refused (outside area)",
+      "owner_denied": "Access refused (not the owner)",
+      "checklist_published": "Checklist published",
+      "assessment_released": "Results released",
+      "plan_approved": "Plan approved",
+      "plan_revised": "Plan revised",
+      "clock_shifted": "Demo clock moved",
+      "reconcile_corrected": "Corrected from ELEVATE"
+    }
+  },
+  "admin": {
+    "intro": "Set up the programme: imports, people and scopes, cycles, rules and the demo clock.",
+    "tabsLabel": "Programme setup sections",
+    "tabs": {
+      "imports": "Imports",
+      "users": "Users and scopes",
+      "cycles": "Cycles",
+      "risk-defaults": "Risk defaults",
+      "escalation-rules": "Escalation rules",
+      "demo-clock": "Demo clock"
+    },
+    "actions": "Actions",
+    "save": "Save",
+    "confirm": {
+      "confirm": "Confirm",
+      "reason": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "reasonRequired": "Choose a reason to continue.",
+      "note": "Note (optional)",
+      "noteHint": "This note is kept in the audit history. Do not write patient details."
+    },
+    "errors": {
+      "offline": "You are offline. Check your connection and try again.",
+      "generic": "This could not be saved. Try again; if it keeps failing, contact the programme team.",
+      "CHECKLIST_PUBLISHED": "This checklist version is published and cannot be changed. Create a new draft instead.",
+      "VERSION_CONFLICT": "Someone changed this since you opened it. Reload the page and try again.",
+      "VALIDATION_FAILED": "Some details are missing or not valid. Check the fields below.",
+      "ELEVATE_UNAVAILABLE": "ELEVATE is not available right now. Nothing was changed; try again in a few minutes.",
+      "DEMO_MODE_DISABLED": "The demo clock is switched off in this environment.",
+      "ROLE_DENIED": "Your role cannot do this."
+    },
+    "imports": {
+      "title": "Import facilities and staff",
+      "help": "Upload a CSV file (up to 5 MB). Facility files create hospitals and wards; staff files create users, set their scope and deactivate people marked as left.",
+      "kind": "File type",
+      "kinds": {
+        "facility": "Facility master",
+        "hr": "Staff list (HR)"
+      },
+      "file": "CSV file",
+      "fileRequired": "Choose a CSV file to upload.",
+      "tooLarge": "The file is larger than 5 MB.",
+      "upload": "Upload and import",
+      "status": "Import status",
+      "statuses": {
+        "queued": "Waiting to start",
+        "running": "Running",
+        "succeeded": "Finished",
+        "partially_succeeded": "Finished with some errors",
+        "failed": "Failed"
+      },
+      "counts": {
+        "rows": "Rows",
+        "created": "Created",
+        "updated": "Updated",
+        "deactivated": "Deactivated",
+        "failed": "Failed rows",
+        "tasksNeedingReassignment": "Tasks to reassign"
+      },
+      "finished": "Finished at",
+      "rowErrors": "Rows that could not be imported",
+      "row": "Row",
+      "code": "Problem",
+      "message": "What to fix",
+      "substitutions": "How ELEVATE was used"
+    },
+    "scopes": {
+      "title": "Users and scopes",
+      "empty": "No assignments yet",
+      "emptyHelp": "Import a staff file or add an assignment below.",
+      "filterRole": "Show role",
+      "allRoles": "All roles",
+      "user": "User id",
+      "userHint": "ELEVATE user id (from the staff import).",
+      "role": "Role",
+      "scope": "Where",
+      "validFrom": "Valid from",
+      "validTo": "Valid until",
+      "open": "No end date",
+      "source": "Source",
+      "sources": {
+        "hr_import": "Staff import",
+        "admin": "Added by admin"
+      },
+      "levels": {
+        "state": "Whole state",
+        "district": "District",
+        "own_tasks": "Own tasks"
+      },
+      "wardCount_one": "{{count}} ward",
+      "wardCount_other": "{{count}} wards",
+      "end": "End",
+      "endTitle": "End this assignment?",
+      "endBody": "{{user}} will lose access as {{role}} now. This is kept in the history.",
+      "reasons": {
+        "left": "Left the post",
+        "moved": "Moved to another place",
+        "error": "Added by mistake"
+      },
+      "ended": "Assignment ended",
+      "newTitle": "Add an assignment",
+      "district": "District code",
+      "facility": "Hospital",
+      "pickFacility": "Choose a hospital",
+      "wards": "Wards",
+      "add": "Add assignment",
+      "created": "Assignment added"
+    },
+    "cycles": {
+      "title": "Assessment cycles",
+      "empty": "No cycles yet",
+      "emptyHelp": "Create the first cycle below.",
+      "code": "Cycle code",
+      "codeHint": "Year and number, for example 2027-C1.",
+      "dates": "Runs",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "baselineBy": "Baseline due by",
+      "repeatBy": "Repeat due by",
+      "status": "Status",
+      "statuses": {
+        "planned": "Planned",
+        "active": "Active",
+        "closed": "Closed"
+      },
+      "planSolution": "ELEVATE plan solution",
+      "none": "Not set",
+      "activate": "Start cycle",
+      "close": "Close cycle",
+      "newTitle": "Create a cycle",
+      "solutionNote": "Each cycle gets its own ELEVATE plan solution and checklist copy, so every ward can have one plan per cycle.",
+      "create": "Create cycle",
+      "created": "Cycle {{code}} created"
+    },
+    "risk": {
+      "title": "Risk defaults",
+      "help": "These apply to findings from the next assessment. Tasks already created keep their rules.",
+      "dueDays": "Days to fix",
+      "photoRequired": "Photo proof required",
+      "minPhotos": "Minimum photos",
+      "secondValidation": "Needs a second validation",
+      "saved": "{{level}} defaults saved"
+    },
+    "rules": {
+      "title": "Escalation rules",
+      "empty": "No escalation rules",
+      "emptyHelp": "Add a rule below.",
+      "code": "Rule",
+      "codeHint": "R followed by a number, for example R4.",
+      "rule": "When and who",
+      "channels": "How",
+      "state": "State",
+      "on": "On",
+      "off": "Off",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "channelNames": {
+        "inapp": "In the app",
+        "email": "Email",
+        "sms": "SMS"
+      },
+      "overdueText": "{{levels}} task overdue by {{hours}} hours",
+      "rejectionsText": "Evidence returned {{count}} times",
+      "anyLevel": "Any",
+      "levelAbove": "The level above the person who decided",
+      "newTitle": "Add a rule",
+      "when": "When",
+      "types": {
+        "overdue": "Task is overdue",
+        "rejections": "Evidence returned again and again"
+      },
+      "hours": "Hours overdue",
+      "count": "Times returned",
+      "target": "Who is told",
+      "targetRole": "A role",
+      "levels": "Risk levels",
+      "alsoEmail": "Also send email",
+      "create": "Add rule",
+      "created": "Rule added"
+    }
+  },
+  "checklists": {
+    "title": "Checklists",
+    "intro": "Published versions never change. A new version replaces the old one after a 7-day grace period; old assessments keep their questions.",
+    "empty": "No checklist versions",
+    "emptyHelp": "Ask the programme team to run the setup.",
+    "versions": "Checklist versions",
+    "code": "Checklist",
+    "version": "Version",
+    "status": "Status",
+    "statuses": {
+      "draft": "Draft",
+      "published": "Published",
+      "retired": "Retired"
+    },
+    "publishedAt": "Published",
+    "graceUntil": "Usable until",
+    "questionCount": "Questions",
+    "showQuestions": "Show v{{version}} questions",
+    "hideQuestions": "Hide v{{version}} questions",
+    "newDraft": "New draft from v{{version}}",
+    "draftCreated": "Draft v{{version}} created",
+    "publish": "Publish v{{version}}",
+    "publishTitle": "Publish version {{version}}?",
+    "publishBody": "After publishing, this version cannot be changed. {{previous}} stays usable for 7 days, then retires; its assessments keep their questions.",
+    "noPrevious": "No earlier version",
+    "publishConfirm": "Publish",
+    "published": "Version {{version}} published",
+    "history": "History",
+    "questions": "Questions",
+    "questionsOf": "Questions in version {{version}}",
+    "readOnly": "This version is published and read-only.",
+    "questionKey": "Key",
+    "question": "Question",
+    "section": "Section",
+    "risk": "Risk",
+    "passMark": "Pass mark"
+  },
+  "demoClock": {
+    "title": "Demo clock",
+    "banner": "Demo time: {{when}}. This is not real time.",
+    "realNow": "Real time",
+    "programmeNow": "Programme time",
+    "isReal": "Programme time is real time.",
+    "isShifted": "Programme time is shifted for the demo.",
+    "disabled": "The demo clock can only be used in demo mode.",
+    "steps": {
+      "PT48H": "Move forward 48 hours",
+      "P7D": "Move forward 7 days",
+      "P30D": "Move forward 30 days"
+    },
+    "reset": "Back to real time",
+    "shifted": "Programme time moved forward",
+    "wasReset": "Back to real time",
+    "elevateNote": "Only programme dates move (due dates, escalations, offline limits, cycles). ELEVATE dates do not change."
+  },
+  "plans": {
+    "intro": "Draft plans made from completed assessments, and the active plans of your hospital.",
+    "back": "Back to plans",
+    "revisionN": "Revision {{n}}",
+    "draftTitle": "Draft plan: {{ward}}",
+    "planTitle": "Improvement plan: {{ward}}",
+    "draftIntro": "Check the tasks, choose owners, set goals and milestones, then approve.",
+    "readOnly": "Only the IPC officer can change and approve this draft.",
+    "queue": {
+      "title": "Draft plans to review",
+      "review": "Review draft",
+      "drafted": "Drafted {{date}}",
+      "counts": "Tasks by risk",
+      "riskCount": "{{count}} {{risk}}",
+      "carried": "{{count}} carried over"
+    },
+    "noActions": {
+      "title": "No actions needed",
+      "description": "No draft plan is waiting. Assessments with no failed questions need no plan; new drafts appear here within a minute."
+    },
+    "active": {
+      "title": "Active plans",
+      "open": "Open plan",
+      "emptyTitle": "No active plans",
+      "emptyDescription": "Approved plans of your hospital appear here."
+    },
+    "editor": {
+      "tasks": "Tasks",
+      "rules": "Evidence: {{evidence}}. Checks: {{validation}}.",
+      "photo": "photo proof ({{count}} or more)",
+      "noPhoto": "no photo needed",
+      "secondValidation": "supervisor and second validation",
+      "supervisorOnly": "supervisor check",
+      "include": "Include this task in the plan",
+      "owner": "Owner",
+      "chooseOwner": "Choose an owner",
+      "ownerNeeded": "Choose who will do this task.",
+      "due": "Due date",
+      "dependsOn": "Can start after",
+      "goals": "Goals",
+      "goalN": "Goal {{n}}",
+      "addGoal": "Add a goal",
+      "milestones": "Milestones",
+      "milestoneN": "Milestone {{n}}",
+      "milestoneDue": "Milestone date",
+      "addMilestone": "Add a milestone",
+      "remove": "Remove",
+      "save": "Save changes",
+      "saved": "Draft saved.",
+      "saveFirst": "Save your changes before you approve.",
+      "ownersFirst": "Every included task needs an owner before you approve."
+    },
+    "approve": {
+      "open": "Approve plan",
+      "title": "Approve this plan?",
+      "description": "{{count}} task(s) will be assigned to their owners and the ward plan is created in ELEVATE.",
+      "confirm": "Approve and assign",
+      "done": "Plan approved. Owners can now see their tasks."
+    },
+    "carried": {
+      "title": "Carried over from the previous plan",
+      "description": "These tasks are still open from the last cycle. They stay linked to their first plan and are tracked here too."
+    },
+    "task": {
+      "title": "Tasks",
+      "owner": "Owner {{user}}",
+      "due": "Due {{date}}",
+      "overdue": "Overdue",
+      "syncing": "Updating ELEVATE"
+    },
+    "findings": {
+      "title": "Findings from later assessments",
+      "description": "A later assessment in this cycle failed these questions. Add a task by changing the plan.",
+      "add": "Add as a task"
+    },
+    "history": {
+      "title": "Plan history",
+      "audit": "Full audit history",
+      "emptyTitle": "No revisions yet",
+      "emptyDescription": "Approval records revision 1.",
+      "by": "By {{user}} ({{role}})",
+      "add": "{{count}} added",
+      "remove": "{{count}} removed",
+      "update": "{{count}} changed"
+    },
+    "revise": {
+      "open": "Change the plan",
+      "title": "Change the plan",
+      "description": "Your change is recorded as revision {{n}} with your reason.",
+      "kind": "What do you want to do?",
+      "ops": {
+        "add": "Add a task",
+        "remove": "Remove a task",
+        "update": "Change a due date"
+      },
+      "taskTitle": "Task",
+      "risk": "Risk level",
+      "task": "Task to change",
+      "chooseTask": "Choose a task",
+      "dueOptional": "Due date (optional)",
+      "reason": "Reason",
+      "reasonHint": "Up to 500 characters. Do not write patient details.",
+      "confirm": "Record change",
+      "done": "Plan changed. The new revision is in the plan history."
+    },
+    "errors": {
+      "conflict": "Someone changed this plan since you opened it. Reload the plan and make your change again.",
+      "elevate": "ELEVATE is not available, so the plan was not changed. Try again in a few minutes.",
+      "validation": "Some details are missing or not valid. Check the plan and try again.",
+      "transition": "This plan can no longer be changed this way. Reload the plan.",
+      "denied": "This plan is outside your area.",
+      "offline": "You are offline. Connect to the internet and try again.",
+      "generic": "The plan could not be saved. Try again."
     }
   }
 }

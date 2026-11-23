@@ -1,6 +1,12 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RequireAuth } from '../features/auth/RequireAuth.js';
 import { AppShell } from '../features/shell/AppShell.js';
+import { HistoryRoute } from '../features/history/HistoryRoute.js';
+import { AdminRoute } from '../features/admin/AdminRoute.js';
+import { ChecklistsRoute } from '../features/admin/ChecklistsRoute.js';
+import { WithDemoClockBanner } from '../features/admin/DemoClock.js';
+import { PlanRoute } from '../features/plans/PlanRoute.js';
+import { PlansRoute } from '../features/plans/PlansRoute.js';
 import { HomeRoute } from './HomeRoute.js';
 import { LoginRoute } from './LoginRoute.js';
 import { NotFoundRoute } from './NotFoundRoute.js';
@@ -18,10 +24,22 @@ export const routes = [
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <HomeRoute /> },
-          { path: 'home', element: <Navigate to="/" replace /> },
-          { path: ':section', element: <SectionRoute /> },
-          { path: '*', element: <NotFoundRoute /> },
+          {
+            // FR-038: demo-clock banner on every signed-in page while programme time is shifted.
+            element: <WithDemoClockBanner />,
+            children: [
+              { index: true, element: <HomeRoute /> },
+              { path: 'home', element: <Navigate to="/" replace /> },
+              { path: 'history/:subjectType/:subjectId', element: <HistoryRoute /> },
+              { path: 'admin', element: <AdminRoute /> },
+              { path: 'admin/:tab', element: <AdminRoute /> },
+              { path: 'checklists', element: <ChecklistsRoute /> },
+              { path: 'plans', element: <PlansRoute /> },
+              { path: 'plans/:planId', element: <PlanRoute /> },
+              { path: ':section', element: <SectionRoute /> },
+              { path: '*', element: <NotFoundRoute /> },
+            ],
+          },
         ],
       },
     ],

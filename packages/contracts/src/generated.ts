@@ -3697,7 +3697,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Publish note recorded in the audit ledger. */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description Published version. */
             200: {

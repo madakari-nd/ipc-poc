@@ -24,6 +24,8 @@ export const edgeConfigSchema = z.object({
   SESSION_ENCRYPTION_KEY: key32,
   SERVICE_JWT_SECRET: z.string().min(32),
   WORKFLOW_URL: z.string().url().default('http://workflow:8080'),
+  /** Adapters private API (US1 imports: createImport / getImport). */
+  ADAPTERS_URL: z.string().url().default('http://adapters:8080'),
   ELEVATE_USER_URL: z.string().url(),
   ELEVATE_SAMIKSHA_URL: z.string().url(),
   ELEVATE_MENTORING_URL: z.string().url().optional(),

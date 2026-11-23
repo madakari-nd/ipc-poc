@@ -19,9 +19,14 @@ import { ifMatchMiddleware } from './middleware/version.js';
 import { OperationIndex, isEdgePrivatePath, isPublicPath } from './openapi/operations.js';
 import { deviceRoutes } from './routes/device.routes.js';
 import { healthRoutes, type Check, type DependencyCheck } from './routes/health.routes.js';
+import { historyRoutes, noHistory, type HistoryForwarder } from './routes/history.routes.js';
 import { evidenceDqRoutes } from './routes/internal/evidence-dq.routes.js';
 import { serviceAuth } from './routes/internal/service-auth.js';
 import { meRoutes } from './routes/me.routes.js';
+import { adminRoutes, type AdminGateways } from './routes/admin.routes.js';
+import { assessmentRoutes, type AssessmentRouteDeps } from './routes/assessments.routes.js';
+import { planRoutes } from './routes/plans.routes.js';
+import type { Forwarder } from './routes/admin.routes.js';
 import { Auditor } from './scope/audit.js';
 import { OwnershipGuard, workflowResolvers } from './scope/ownership.guard.js';
 import { scopeMiddleware } from './scope/scope.middleware.js';
@@ -60,7 +65,15 @@ export interface EdgeDeps {
   /** Reported by /dependencies (ELEVATE, workflow); never fails readiness. */
   dependencies?: DependencyCheck[];
   rateLimitStore?: (prefix: string) => Store;
+  /** Mirrored history GETs to workflow (US9, T065). */
+  history?: HistoryForwarder;
   now?: () => number;
+  /** US1 programme setup: mirrored admin/catalogue/demo routes (workflow) and imports (adapters). */
+  admin?: AdminGateways;
+  /** US2 assessments: workflow contexts + samiksha with the user's token. Absent → 503 on those routes. */
+  assessments?: AssessmentRouteDeps;
+  /** US3 plans: mirrored to workflow (defaults to the admin workflow forwarder). */
+  plans?: Forwarder;
 }
 
 /** Strict CSP for a JSON API: nothing may load, frame or submit (Constitution XIII). */
@@ -169,6 +182,11 @@ export function createApps(deps: EdgeDeps) {
   v1.use(meRoutes(workflow, ctx));
   v1.use(evidenceRoutes(evidence, guard));
   v1.use(deviceRoutes(models, now));
+  v1.use(assessmentRoutes(deps.assessments, { sessions, guard, audit, models, now }));
+  if (deps.admin) v1.use(adminRoutes(deps.admin));
+  const planForwarder = deps.plans ?? deps.admin?.workflow;
+  if (planForwarder) v1.use(planRoutes(planForwarder, guard, audit));
+  v1.use(historyRoutes(deps.history ?? noHistory, guard, audit));
   pub.use('/ipc/v1', v1);
   errorTail(pub, logger);
 

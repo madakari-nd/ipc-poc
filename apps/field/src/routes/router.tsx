@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RequireSession } from '../features/session/RequireSession.js';
 import { AppShell } from '../features/shell/AppShell.js';
+import { AssessmentFormRoute } from './AssessmentFormRoute.js';
+import { AssessmentsRoute } from './AssessmentsRoute.js';
 import { ConflictRoute } from './ConflictRoute.js';
 import { HomeRoute } from './HomeRoute.js';
 import { LoginRoute } from './LoginRoute.js';
@@ -23,6 +25,8 @@ export const router = createBrowserRouter(
             { path: 'queue', element: <QueueRoute /> },
             { path: 'queue/:itemId/review', element: <ConflictRoute /> },
             { path: 'home', element: <Navigate to="/" replace /> },
+            { path: 'assessments', element: <AssessmentsRoute /> },
+            { path: 'assessments/:assessmentId', element: <AssessmentFormRoute /> },
             { path: ':section', element: <SectionRoute /> },
             { path: '*', element: <NotFoundRoute /> },
           ],

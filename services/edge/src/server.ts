@@ -7,8 +7,11 @@ import { edgeDbName, loadEdgeConfig, type EdgeConfig } from './config/config.js'
 import { createModels } from './db/models.js';
 import { ProxiedElevateUserApi } from './elevate/elevate.adapter.js';
 import { S3ObjectStore } from './evidence/object-store.js';
-import { ElevateProxy, type ElevateService } from './proxy/elevate.proxy.js';
+import { ChecklistEditGuard, ElevateProxy, workflowLockedChecklists, type ElevateService } from './proxy/elevate.proxy.js';
+import { HttpForwarder } from './routes/admin.routes.js';
 import type { DependencyCheck } from './routes/health.routes.js';
+import { HttpHistoryForwarder } from './routes/history.routes.js';
+import { HttpAssessmentWorkflow, ProxiedAssessmentElevate } from './routes/assessments.ports.js';
 import { HttpWorkflowClient } from './workflow/workflow.client.js';
 
 const logger = createLogger('edge');
@@ -49,9 +52,12 @@ async function main() {
     bucket: cfg.EVIDENCE_BUCKET,
   });
   const workflow = new HttpWorkflowClient(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET);
+  const checklistGuard = new ChecklistEditGuard(workflowLockedChecklists(workflow), (entry) => workflow.appendLedger(entry));
   const proxy = new ElevateProxy(
     { user: cfg.ELEVATE_USER_URL, samiksha: cfg.ELEVATE_SAMIKSHA_URL, mentoring: cfg.ELEVATE_MENTORING_URL },
     cfg.ELEVATE_ORIGIN,
+    undefined,
+    checklistGuard,
   );
 
   const elevateDeps: DependencyCheck[] = (
@@ -75,6 +81,12 @@ async function main() {
     models,
     workflow,
     elevateUser: new ProxiedElevateUserApi(proxy),
+    history: new HttpHistoryForwarder(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET),
+    assessments: { workflow: new HttpAssessmentWorkflow(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET), elevate: new ProxiedAssessmentElevate(proxy) },
+    admin: {
+      workflow: new HttpForwarder(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET, { audience: 'ipc-workflow', service: 'workflow' }),
+      adapters: new HttpForwarder(cfg.ADAPTERS_URL, cfg.SERVICE_JWT_SECRET, { audience: 'ipc-adapters', service: 'adapters' }),
+    },
     store,
     logger,
     readiness: { mongo: mongoUp, minio: () => store.ping() },
