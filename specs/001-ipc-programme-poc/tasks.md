@@ -62,12 +62,12 @@ its own once Phase 2 is done.
 
 ### Platform package
 
-- [ ] T012 [P] Write `packages/platform/src/config.ts`: a zod-validated env loader that refuses to start on missing or invalid config. Write its unit test first in `packages/platform/tests/config.test.ts`
-- [ ] T013 [P] Write `packages/platform/src/logger.ts`: a pino logger with correlationId from traceparent, and redaction of tokens, cookies, passwords and free text
-- [ ] T014 [P] Write `packages/platform/src/errors.ts`: problem+json errors with the stable `code` enum from `contracts/openapi.yaml`, plus Express 5 error middleware
-- [ ] T015 [P] Write `packages/platform/src/resilience.ts`: cockatiel timeout (5 s), retry with jitter (idempotent calls only) and circuit breaker. Write its unit tests in `packages/platform/tests/resilience.test.ts`
-- [ ] T016 [P] Write `packages/platform/src/metrics.ts` and `health.ts`: a prom-client registry, HTTP metrics middleware, and `/healthz`, `/readyz` (own stores only) and `/dependencies` (ELEVATE status) per NFR-004
-- [ ] T017 [P] Write `packages/platform/src/shutdown.ts`: graceful drain within 30 s, stop the consumers, then close Mongo (NFR-004)
+- [X] T012 [P] Write `packages/platform/src/config.ts`: a zod-validated env loader that refuses to start on missing or invalid config. Write its unit test first in `packages/platform/tests/config.test.ts`
+- [X] T013 [P] Write `packages/platform/src/logger.ts`: a pino logger with correlationId from traceparent, and redaction of tokens, cookies, passwords and free text
+- [X] T014 [P] Write `packages/platform/src/errors.ts`: problem+json errors with the stable `code` enum from `contracts/openapi.yaml`, plus Express 5 error middleware
+- [X] T015 [P] Write `packages/platform/src/resilience.ts`: cockatiel timeout (5 s), retry with jitter (idempotent calls only) and circuit breaker. Write its unit tests in `packages/platform/tests/resilience.test.ts`
+- [X] T016 [P] Write `packages/platform/src/metrics.ts` and `health.ts`: a prom-client registry, HTTP metrics middleware, and `/healthz`, `/readyz` (own stores only) and `/dependencies` (ELEVATE status) per NFR-004
+- [X] T017 [P] Write `packages/platform/src/shutdown.ts`: graceful drain within 30 s, stop the consumers, then close Mongo (NFR-004)
 
 ### ELEVATE client package (real ELEVATE; unit tests stub only these interfaces)
 
