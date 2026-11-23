@@ -4,16 +4,22 @@
   "private": true,
   "type": "module",
   "description": "Shared design tokens, Tailwind preset and accessible components (Constitution IX)",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./tailwind-preset": {
+      "types": "./src/tailwind-preset.ts",
+      "default": "./src/tailwind-preset.ts"
+    },
+    "./css/variables.css": "./src/css/variables.css",
+    "./tokens.json": "./tokens.json"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

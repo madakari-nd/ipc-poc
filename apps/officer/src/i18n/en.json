@@ -1,0 +1,148 @@
+{
+  "app": { "name": "IPC Programme", "skipToContent": "Skip to main content" },
+  "common": { "close": "Close", "dismiss": "Dismiss", "cancel": "Cancel" },
+  "nav": {
+    "label": "Main menu",
+    "home": "Home",
+    "assessments": "Assessments",
+    "plans": "Improvement plans",
+    "tasks": "Tasks",
+    "reviews": "Review queue",
+    "validations": "Validations",
+    "escalations": "Escalations",
+    "support": "Expert support",
+    "oversight": "Oversight",
+    "checklists": "Checklists",
+    "admin": "Programme setup",
+    "ledger": "Audit history",
+    "signOut": "Sign out",
+    "language": "Language",
+    "style": "Design system"
+  },
+  "state": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "empty": { "title": "Nothing here yet", "description": "There is nothing to show right now." },
+    "error": { "title": "Something went wrong", "description": "We could not load this. Try again. If it keeps happening, contact the programme team." },
+    "offline": { "title": "You are offline", "description": "Check your internet connection and try again." },
+    "denied": { "title": "You cannot open this", "description": "Your role does not include this area. Go back to Home." }
+  },
+  "roles": {
+    "STATE_ADMIN": "State administrator",
+    "DISTRICT_QM": "District quality manager",
+    "IPC_OFFICER": "IPC officer",
+    "WARD_SUPERVISOR": "Ward supervisor",
+    "FRONTLINE": "Frontline staff",
+    "MENTOR": "Expert mentor",
+    "EXTERNAL_AUDITOR": "External auditor"
+  },
+  "auth": {
+    "title": "Sign in",
+    "identifier": "Email or phone number",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid": "The email, phone number or password is not right. Check and try again.",
+    "rateLimited": "Too many tries. Wait one minute and try again.",
+    "unavailable": "Sign-in is not working right now. Try again in a few minutes.",
+    "offline": "You are offline. Connect to the internet to sign in.",
+    "expired": "You were signed out after 30 minutes without activity. Sign in again.",
+    "loggedOut": "You have signed out."
+  },
+  "wrongApp": {
+    "title": "Use the field app",
+    "description": "Frontline staff work in the field app on their phone.",
+    "action": "Open the field app"
+  },
+  "home": {
+    "title": "What needs you now",
+    "open": "Open",
+    "due": "Due {{date}}",
+    "nothing": { "title": "Nothing needs you right now", "description": "New work will show up here." },
+    "intro": {
+      "STATE_ADMIN": "Programme setup, oversight and audit across the state.",
+      "DISTRICT_QM": "Hospitals in your district: validations, escalations and progress.",
+      "IPC_OFFICER": "Your hospital: assessments, plans, validations and expert support.",
+      "WARD_SUPERVISOR": "Your wards: evidence to review and tasks to assign.",
+      "FRONTLINE": "Your tasks.",
+      "MENTOR": "Support sessions you have accepted.",
+      "EXTERNAL_AUDITOR": "Read-only plans, evidence and history for your hospitals."
+    },
+    "cards": {
+      "assessments_due": "Assessments due",
+      "draft_plans": "Draft plans",
+      "my_tasks": "My tasks",
+      "review_queue": "Evidence to review",
+      "validation_queue": "Tasks to validate",
+      "needs_reassignment": "Tasks to reassign",
+      "overdue_critical": "Overdue critical tasks",
+      "escalations": "Escalations",
+      "support_requests": "Support requests",
+      "held_results": "Results on hold",
+      "unread_notifications": "Unread messages",
+      "stale_devices": "Phones not synced",
+      "data_quality_exceptions": "Data quality issues",
+      "checklist_drafts": "Checklist drafts",
+      "import_jobs": "Imports"
+    }
+  },
+  "section": {
+    "backHome": "Back to home",
+    "comingSoon": { "title": "This area is not ready yet", "description": "It will be added soon. Use Home for your current work." }
+  },
+  "notFound": { "title": "Page not found", "description": "This page does not exist. Go back to Home." },
+  "risk": { "critical": "Critical", "high": "High", "normal": "Normal" },
+  "taskState": {
+    "ASSIGNED": "Assigned",
+    "IN_PROGRESS": "In progress",
+    "EVIDENCE_SUBMITTED": "Evidence sent",
+    "CHANGES_REQUESTED": "Changes needed",
+    "VERIFIED": "Verified",
+    "PENDING_VALIDATION": "Waiting for validation",
+    "CLOSED": "Closed"
+  },
+  "legend": { "reused": "ELEVATE reused", "customised": "ELEVATE customised", "built-on-top": "Built on top" },
+  "style": {
+    "title": "Design system",
+    "description": "Tokens and components shared by the field app and the officer website.",
+    "backToApp": "Back to the website",
+    "colours": {
+      "title": "Colours",
+      "note": "Every text and background pair reaches a contrast of at least 4.5 : 1.",
+      "caption": "Semantic colour tokens",
+      "sample": "Sample",
+      "token": "Token",
+      "values": "Text / background",
+      "contrast": "Contrast"
+    },
+    "chips": { "title": "Status, risk and legend chips", "note": "Status is never shown by colour alone: each chip has a text label and an icon." },
+    "buttons": { "title": "Buttons", "primary": "Save", "secondary": "Cancel", "danger": "Return task", "ghost": "More", "busy": "Saving" },
+    "forms": {
+      "title": "Form fields",
+      "note": "Note",
+      "noteHint": "Up to 500 characters. Do not write patient details.",
+      "withError": "Ward name",
+      "errorText": "Enter the ward name.",
+      "reason": "Reason",
+      "choose": "Choose a reason"
+    },
+    "dialog": { "title": "Confirm with a reason", "note": "Irreversible actions (return, validate, close, escalate) ask for confirmation and a reason." },
+    "toast": { "title": "Messages (toasts)", "success": "Show success", "error": "Show error" },
+    "boundary": {
+      "title": "Screen states",
+      "note": "Every screen shows loading, empty, error, offline and no-permission states with a next step.",
+      "pick": "State to show",
+      "content": "The screen content appears here when it is ready.",
+      "states": { "loading": "Loading", "empty": "Empty", "error": "Error", "offline": "Offline", "denied": "No permission", "ready": "Ready" }
+    },
+    "empty": { "title": "Empty state" },
+    "scale": { "title": "Spacing and type scale" },
+    "demo": {
+      "returnTask": "Return task",
+      "returnDescription": "The task goes back to its owner with your reason.",
+      "reasonUnclear": "Photo is not clear",
+      "reasonMissing": "Evidence is missing",
+      "reasonRequired": "Choose a reason.",
+      "done": "Done."
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "app": { "name": "IPC ಕಾರ್ಯಕ್ರಮ" },
+  "common": { "close": "ಮುಚ್ಚಿ", "cancel": "ರದ್ದುಮಾಡಿ" },
+  "nav": { "home": "ಮುಖಪುಟ", "tasks": "ಕೆಲಸಗಳು", "signOut": "ಸೈನ್ ಔಟ್", "language": "ಭಾಷೆ" },
+  "state": { "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…", "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ" },
+  "auth": { "title": "ಸೈನ್ ಇನ್", "password": "ಪಾಸ್‌ವರ್ಡ್", "submit": "ಸೈನ್ ಇನ್" },
+  "risk": { "critical": "ಗಂಭೀರ", "high": "ಹೆಚ್ಚು", "normal": "ಸಾಮಾನ್ಯ" }
+}

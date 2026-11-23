@@ -1,0 +1,4 @@
+@import '@ipc/design-system/css/variables.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

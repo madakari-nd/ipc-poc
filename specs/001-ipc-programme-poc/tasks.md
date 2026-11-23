@@ -140,24 +140,24 @@ its own once Phase 2 is done.
 
 ### Design system and app shells
 
-- [ ] T047 [P] Write `packages/design-system/tokens.json`, `src/tailwind-preset.ts` and `src/css/variables.css`:
+- [X] T047 [P] Write `packages/design-system/tokens.json`, `src/tailwind-preset.ts` and `src/css/variables.css`:
   - colour, a 4 px spacing scale, type, radius and elevation
   - semantic tokens for the 7 task states, 3 risk levels and the legend
   - contrast ≥ 4.5:1, checked by `tests/contrast.test.ts`
-- [ ] T048 [P] Write `packages/design-system/src/components/`: Button, Field, Select, Dialog (ConfirmWithReason), Toast, StatusChip (text + icon), RiskChip, DataTable, EmptyState, `StateBoundary` (loading, empty, error, offline, denied), PageHeader, LanguageSwitch. All are built on Radix primitives with 44 px touch targets
-- [ ] T049 Scaffold `apps/officer`: Vite, React Router, TanStack Query, react-i18next (`src/i18n/{en,hi,kn}.json`), an auth guard and a role-based nav. Add a living style page at `/officer/style` (Constitution IX)
-- [ ] T050 Scaffold `apps/field`:
+- [X] T048 [P] Write `packages/design-system/src/components/`: Button, Field, Select, Dialog (ConfirmWithReason), Toast, StatusChip (text + icon), RiskChip, DataTable, EmptyState, `StateBoundary` (loading, empty, error, offline, denied), PageHeader, LanguageSwitch. All are built on Radix primitives with 44 px touch targets
+- [X] T049 Scaffold `apps/officer`: Vite, React Router, TanStack Query, react-i18next (`src/i18n/{en,hi,kn}.json`), an auth guard and a role-based nav. Add a living style page at `/officer/style` (Constitution IX)
+- [X] T050 Scaffold `apps/field`:
   - Vite and vite-plugin-pwa (manifest, Workbox), React Router, TanStack Query and i18n (en, hi, kn)
   - auth with the device session
   - a 7-day offline guard that uses device time, warns from day 5 and wipes after more than 7 × 24 h
-- [ ] T051 Write the field offline core, test-first in `apps/field/tests/outbox.test.ts`:
+- [X] T051 Write the field offline core, test-first in `apps/field/tests/outbox.test.ts`:
   - `apps/field/src/offline/{db.ts,crypto.ts,outbox.ts,sync.ts}`: Dexie with AES-GCM (key from PBKDF2 at sign-in)
   - an ordered outbox (evidence → records → decisions) where a failure blocks only the items that depend on it
   - per-item status, background sync with a foreground retry, an Idempotency-Key per item, and a queue-status report
   - on logout and at the 7-day limit, delete the Dexie database and the derived key (Constitution VII)
   - a 403 for a scope that changed marks the item "needs attention: your access changed" and keeps it read-only (spec edge case)
-- [ ] T052 [P] Write `apps/field/src/features/capture/PhotoCapture.tsx`: camera input, GPS (or the "GPS unavailable" flag), device time, and a SHA-256 computed with Web Crypto on the device
-- [ ] T053 [P] Write `apps/field/src/features/conflict/DiffReview.tsx`: the 409 differences view for re-applying changes (FR-016)
+- [X] T052 [P] Write `apps/field/src/features/capture/PhotoCapture.tsx`: camera input, GPS (or the "GPS unavailable" flag), device time, and a SHA-256 computed with Web Crypto on the device
+- [X] T053 [P] Write `apps/field/src/features/conflict/DiffReview.tsx`: the 409 differences view for re-applying changes (FR-016)
 
 ### Seed, reset, operations base
 

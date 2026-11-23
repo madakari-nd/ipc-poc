@@ -1,0 +1,162 @@
+{
+  "app": { "name": "IPC Field", "skipToContent": "Skip to main content" },
+  "common": { "close": "Close", "dismiss": "Dismiss" },
+  "nav": {
+    "label": "Main menu",
+    "home": "Home",
+    "tasks": "My tasks",
+    "reviews": "Review queue",
+    "assessments": "Assessments",
+    "queue": "Sync queue",
+    "signOut": "Sign out",
+    "language": "Language"
+  },
+  "state": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "empty": { "title": "Nothing here yet", "description": "There is nothing to show right now." },
+    "error": { "title": "Something went wrong", "description": "We could not load this. Try again. If it keeps happening, tell your supervisor." },
+    "offline": { "title": "You are offline", "description": "Connect to the internet and try again. Your saved work stays on this phone." },
+    "denied": { "title": "You cannot open this", "description": "Your role does not include this. Ask your supervisor if you think this is wrong." }
+  },
+  "roles": {
+    "STATE_ADMIN": "State administrator",
+    "DISTRICT_QM": "District quality manager",
+    "IPC_OFFICER": "IPC officer",
+    "WARD_SUPERVISOR": "Ward supervisor",
+    "FRONTLINE": "Frontline staff",
+    "MENTOR": "Expert mentor",
+    "EXTERNAL_AUDITOR": "External auditor"
+  },
+  "auth": {
+    "title": "Sign in",
+    "identifier": "Email or phone number",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid": "The email, phone number or password is not right. Check and try again.",
+    "rateLimited": "Too many tries. Wait one minute and try again.",
+    "unavailable": "Sign-in is not working right now. Try again in a few minutes.",
+    "offline": "You are offline. Connect to the internet to sign in.",
+    "expired": "This phone was offline for more than 7 days, so saved data was removed. Sign in again.",
+    "loggedOut": "You have signed out. Data on this phone was removed.",
+    "sessionEnded": "Your session ended. Sign in again to keep sending your work.",
+    "unlock": "Sign in again to open the work saved on this phone."
+  },
+  "signOut": {
+    "title": "Sign out?",
+    "description": "Everything saved on this phone will be removed.",
+    "pendingWarning_one": "{{count}} item has not been sent yet and will be lost.",
+    "pendingWarning_other": "{{count}} items have not been sent yet and will be lost.",
+    "confirm": "Sign out and remove data",
+    "cancel": "Stay signed in"
+  },
+  "wrongApp": {
+    "title": "Use the officer website",
+    "description": "Your role works in the officer website, not in the field app.",
+    "action": "Open the officer website"
+  },
+  "offlineGuard": {
+    "offline": "Offline: your work is saved on this phone and will be sent when you are back online.",
+    "warn_one": "Connect to the internet within {{count}} day, or the data saved on this phone will be removed.",
+    "warn_other": "Connect to the internet within {{count}} days, or the data saved on this phone will be removed."
+  },
+  "home": {
+    "title": "What needs you now",
+    "open": "Open",
+    "offlineNote": "You are offline. Showing what was saved at {{time}}.",
+    "unsent_one": "{{count}} item is waiting to be sent. Open the sync queue.",
+    "unsent_other": "{{count}} items are waiting to be sent. Open the sync queue.",
+    "nothing": { "title": "Nothing needs you right now", "description": "New work will show up here." },
+    "cards": {
+      "assessments_due": "Assessments due",
+      "draft_plans": "Draft plans",
+      "my_tasks": "My tasks",
+      "review_queue": "Evidence to review",
+      "validation_queue": "Tasks to validate",
+      "needs_reassignment": "Tasks to reassign",
+      "overdue_critical": "Overdue critical tasks",
+      "escalations": "Escalations",
+      "support_requests": "Support requests",
+      "held_results": "Results on hold",
+      "unread_notifications": "Unread messages",
+      "stale_devices": "Phones not synced",
+      "data_quality_exceptions": "Data quality issues",
+      "checklist_drafts": "Checklist drafts",
+      "import_jobs": "Imports"
+    }
+  },
+  "queue": {
+    "title": "Sync queue",
+    "description": "Work saved on this phone and whether it has been sent.",
+    "sendNow": "Send now",
+    "retrying": "Trying to send again.",
+    "retry": "Try again",
+    "review": "Review differences",
+    "readOnly": "Read-only",
+    "waitingFor": "Waiting for an earlier item to be sent.",
+    "willRetry": "Will try again at {{time}}.",
+    "empty": { "title": "Nothing waiting", "description": "Everything has been sent." },
+    "columns": { "item": "Item", "status": "Status", "detail": "Details", "action": "Next step" },
+    "status": { "pending": "Pending", "sent": "Sent", "needs_attention": "Needs attention" },
+    "kind": { "evidence": "Photo or file", "record": "Record", "decision": "Decision" },
+    "attention": {
+      "access_changed": "Needs attention: your access changed. This item can no longer be sent. Ask your supervisor.",
+      "conflict": "Someone changed this before you. Review the differences.",
+      "rejected": "This was not accepted ({{code}}). Check it or ask your supervisor.",
+      "retries_exhausted": "Could not send after several tries. Try again when the network is better."
+    }
+  },
+  "capture": {
+    "title": "Take a photo",
+    "noPatients": "Do not include patients or their details in the photo.",
+    "take": "Open camera",
+    "working": "Preparing the photo…",
+    "previewAlt": "Photo you just took",
+    "time": "Taken at",
+    "location": "Location",
+    "gps": "{{lat}}, {{lng}} (within {{accuracy}} m)",
+    "gpsUnavailable": "Location not available",
+    "fingerprint": "Photo fingerprint",
+    "use": "Use this photo",
+    "retake": "Take again",
+    "problem": {
+      "type": "This file type cannot be used. Take a JPEG or PNG photo.",
+      "size": "The photo is too large (more than 10 MB). Take it again at a lower quality.",
+      "read": "The photo could not be read. Take it again."
+    }
+  },
+  "diff": {
+    "title": "Review differences",
+    "back": "Back to sync queue",
+    "caption": "Your change compared with the latest version",
+    "field": "Field",
+    "mine": "Your change",
+    "server": "Latest version",
+    "keepMine": "Keep yours?",
+    "keep": "Keep mine",
+    "same": "Same",
+    "none": "(empty)",
+    "explain_one": "Someone saved a newer version first. {{count}} field is different. Choose what to keep.",
+    "explain_other": "Someone saved a newer version first. {{count}} fields are different. Choose what to keep.",
+    "reapply": "Send my change again",
+    "keepServer": "Keep the latest version",
+    "reapplied": "Your change will be sent again.",
+    "discarded": "Your change was removed. The latest version is kept.",
+    "gone": { "title": "Nothing to review", "description": "This item has no differences to review any more." }
+  },
+  "section": {
+    "backHome": "Back to home",
+    "comingSoon": { "title": "This screen is not ready yet", "description": "It will be added soon. Use Home for your current work." }
+  },
+  "notFound": { "title": "Page not found", "description": "This page does not exist. Go back to Home." },
+  "risk": { "critical": "Critical", "high": "High", "normal": "Normal" },
+  "taskState": {
+    "ASSIGNED": "Assigned",
+    "IN_PROGRESS": "In progress",
+    "EVIDENCE_SUBMITTED": "Evidence sent",
+    "CHANGES_REQUESTED": "Changes needed",
+    "VERIFIED": "Verified",
+    "PENDING_VALIDATION": "Waiting for validation",
+    "CLOSED": "Closed"
+  }
+}

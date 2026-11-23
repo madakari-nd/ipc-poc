@@ -9,10 +9,10 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "outDir": "dist",
-    "rootDir": "src"
+    "noEmit": true
   },
   "include": [
-    "src"
+    "src",
+    "tokens.json"
   ]
 }

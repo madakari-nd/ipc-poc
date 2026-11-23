@@ -1,0 +1,118 @@
+/* Generated from tokens.json (Constitution IX). Kept in sync by tests/css-variables.test.ts. */
+:root {
+  --ipc-color-base-surface: #ffffff;
+  --ipc-color-base-surface-muted: #f3f4f6;
+  --ipc-color-base-text: #111827;
+  --ipc-color-base-text-muted: #4b5563;
+  --ipc-color-base-border: #6b7280;
+  --ipc-color-base-border-subtle: #d1d5db;
+  --ipc-color-base-focus: #1d4ed8;
+  --ipc-color-base-overlay: #111827;
+  --ipc-color-action-primary-fg: #ffffff;
+  --ipc-color-action-primary-bg: #1d4ed8;
+  --ipc-color-action-primary-hover: #1e40af;
+  --ipc-color-action-secondary-fg: #1e3a8a;
+  --ipc-color-action-secondary-bg: #eff6ff;
+  --ipc-color-action-secondary-hover: #dbeafe;
+  --ipc-color-action-danger-fg: #ffffff;
+  --ipc-color-action-danger-bg: #b91c1c;
+  --ipc-color-action-danger-hover: #991b1b;
+  --ipc-color-action-ghost-fg: #1f2937;
+  --ipc-color-action-ghost-bg: #ffffff;
+  --ipc-color-action-ghost-hover: #f3f4f6;
+  --ipc-color-feedback-info-fg: #1e3a8a;
+  --ipc-color-feedback-info-bg: #dbeafe;
+  --ipc-color-feedback-success-fg: #14532d;
+  --ipc-color-feedback-success-bg: #dcfce7;
+  --ipc-color-feedback-warning-fg: #78350f;
+  --ipc-color-feedback-warning-bg: #fef3c7;
+  --ipc-color-feedback-error-fg: #7f1d1d;
+  --ipc-color-feedback-error-bg: #fee2e2;
+  --ipc-color-feedback-offline-fg: #1f2937;
+  --ipc-color-feedback-offline-bg: #e5e7eb;
+  --ipc-color-state-assigned-fg: #1e3a8a;
+  --ipc-color-state-assigned-bg: #dbeafe;
+  --ipc-color-state-in-progress-fg: #5b21b6;
+  --ipc-color-state-in-progress-bg: #ede9fe;
+  --ipc-color-state-evidence-submitted-fg: #155e75;
+  --ipc-color-state-evidence-submitted-bg: #cffafe;
+  --ipc-color-state-changes-requested-fg: #9a3412;
+  --ipc-color-state-changes-requested-bg: #ffedd5;
+  --ipc-color-state-verified-fg: #166534;
+  --ipc-color-state-verified-bg: #dcfce7;
+  --ipc-color-state-pending-validation-fg: #854d0e;
+  --ipc-color-state-pending-validation-bg: #fef9c3;
+  --ipc-color-state-closed-fg: #374151;
+  --ipc-color-state-closed-bg: #f3f4f6;
+  --ipc-color-risk-critical-fg: #ffffff;
+  --ipc-color-risk-critical-bg: #b91c1c;
+  --ipc-color-risk-high-fg: #7c2d12;
+  --ipc-color-risk-high-bg: #fed7aa;
+  --ipc-color-risk-normal-fg: #1f2937;
+  --ipc-color-risk-normal-bg: #e5e7eb;
+  --ipc-color-legend-reused-fg: #065f46;
+  --ipc-color-legend-reused-bg: #d1fae5;
+  --ipc-color-legend-customised-fg: #6b21a8;
+  --ipc-color-legend-customised-bg: #f3e8ff;
+  --ipc-color-legend-built-on-top-fg: #92400e;
+  --ipc-color-legend-built-on-top-bg: #fef3c7;
+  --ipc-space-0: 0px;
+  --ipc-space-1: 4px;
+  --ipc-space-2: 8px;
+  --ipc-space-3: 12px;
+  --ipc-space-4: 16px;
+  --ipc-space-5: 20px;
+  --ipc-space-6: 24px;
+  --ipc-space-8: 32px;
+  --ipc-space-10: 40px;
+  --ipc-space-11: 44px;
+  --ipc-space-12: 48px;
+  --ipc-space-16: 64px;
+  --ipc-space-20: 80px;
+  --ipc-space-24: 96px;
+  --ipc-size-touch: 44px;
+  --ipc-font-family-sans: system-ui, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Kannada", sans-serif;
+  --ipc-font-family-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --ipc-font-size-xs: 12px;
+  --ipc-font-size-xs-line-height: 16px;
+  --ipc-font-size-sm: 14px;
+  --ipc-font-size-sm-line-height: 20px;
+  --ipc-font-size-base: 16px;
+  --ipc-font-size-base-line-height: 24px;
+  --ipc-font-size-lg: 18px;
+  --ipc-font-size-lg-line-height: 28px;
+  --ipc-font-size-xl: 20px;
+  --ipc-font-size-xl-line-height: 28px;
+  --ipc-font-size-2xl: 24px;
+  --ipc-font-size-2xl-line-height: 32px;
+  --ipc-font-size-3xl: 30px;
+  --ipc-font-size-3xl-line-height: 36px;
+  --ipc-font-weight-regular: 400;
+  --ipc-font-weight-medium: 500;
+  --ipc-font-weight-semibold: 600;
+  --ipc-font-weight-bold: 700;
+  --ipc-radius-none: 0px;
+  --ipc-radius-sm: 4px;
+  --ipc-radius-md: 8px;
+  --ipc-radius-lg: 12px;
+  --ipc-radius-full: 9999px;
+  --ipc-elevation-0: none;
+  --ipc-elevation-1: 0 1px 2px rgba(17, 24, 39, 0.12);
+  --ipc-elevation-2: 0 4px 8px rgba(17, 24, 39, 0.14);
+  --ipc-elevation-3: 0 12px 24px rgba(17, 24, 39, 0.18);
+}
+
+/* Visible focus for every interactive element (WCAG 2.4.7 / 2.4.11). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--ipc-color-base-focus);
+  outline-offset: 2px;
+}
+
+body {
+  margin: 0;
+  background: var(--ipc-color-base-surface);
+  color: var(--ipc-color-base-text);
+  font-family: var(--ipc-font-family-sans);
+  font-size: var(--ipc-font-size-base);
+  line-height: var(--ipc-font-size-base-line-height);
+}
