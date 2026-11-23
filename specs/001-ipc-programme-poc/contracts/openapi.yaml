@@ -3527,7 +3527,7 @@ components:
       required: [questionKey, sectionKey, text, riskLevel, passMark, maxScore]
       additionalProperties: false
       properties:
-        questionKey: {type: string, pattern: '^[A-Z0-9_.-]{1,40}$', description: Stable programme key across versions.}
+        questionKey: {type: string, pattern: '^[a-z0-9_.-]{1,40}$', description: Stable programme key across versions.}
         elevateQuestionExternalId: {type: string, maxLength: 64}
         sectionKey: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
         text: {$ref: '#/components/schemas/LocalizedText'}
