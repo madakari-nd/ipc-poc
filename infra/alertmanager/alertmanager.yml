@@ -1,0 +1,4 @@
+# POC: alerts are visible in Alertmanager UI / Grafana; wire a receiver (email/webhook) for the pilot.
+route: { receiver: default, group_by: [alertname], group_wait: 30s, repeat_interval: 4h }
+receivers:
+  - name: default

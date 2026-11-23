@@ -1,0 +1,33 @@
+# The 6 alerts from research.md §5 (NFR-003).
+groups:
+  - name: ipc
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{code=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1e-9) > 0.02
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "More than 2% of requests fail with 5xx" }
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "p95 programme-layer latency above 500 ms" }
+      - alert: OutboxBacklog
+        expr: max(outbox_pending) > 100
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "More than 100 events waiting to be published" }
+      - alert: DeadLettersPresent
+        expr: max(dlq_size) > 0
+        for: 1m
+        labels: { severity: warn }
+        annotations: { summary: "Events in the dead-letter store; run npm run dlq:replay after fixing the cause" }
+      - alert: EscalationSweepFailed
+        expr: increase(escalation_sweep_failures_total[1h]) > 0
+        labels: { severity: page }
+        annotations: { summary: "An escalation sweep failed; overdue tasks may not be escalated" }
+      - alert: ElevateDependencyDown
+        expr: max by (service) (elevate_circuit_state) >= 2
+        for: 2m
+        labels: { severity: page }
+        annotations: { summary: "Circuit to ELEVATE {{ $labels.service }} is open; affected journeys are degraded" }

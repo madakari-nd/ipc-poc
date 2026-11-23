@@ -1,0 +1,239 @@
+{
+ "title": "IPC operations",
+ "uid": "ipc-ops",
+ "schemaVersion": 39,
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "templating": {
+  "list": [
+   {
+    "name": "DS",
+    "type": "datasource",
+    "query": "prometheus"
+   }
+  ]
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Outbox pending",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 0
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "targets": [
+    {
+     "expr": "max(outbox_pending)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Dead letters",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 0
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "targets": [
+    {
+     "expr": "max(dlq_size)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Stale devices (>72h)",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 0
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "targets": [
+    {
+     "expr": "max(device_stale_queues)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Sweep failures (24h)",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 18,
+    "y": 0
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "targets": [
+    {
+     "expr": "increase(escalation_sweep_failures_total[24h])",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Request rate",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum by (job) (rate(http_requests_total[5m]))",
+     "legendFormat": "{{job}}",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "5xx ratio",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(http_requests_total{code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])),1e-9)",
+     "legendFormat": "5xx",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "p95 latency (programme layer)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 12
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+     "legendFormat": "{{job}}",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "p95 ELEVATE call time",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 12
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum by (le, service) (rate(elevate_call_duration_seconds_bucket[5m])))",
+     "legendFormat": "{{service}}",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "ELEVATE circuit state (0 closed, 2 open)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 20
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "${DS}"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    }
+   },
+   "targets": [
+    {
+     "expr": "max by (service) (elevate_circuit_state)",
+     "legendFormat": "{{service}}",
+     "refId": "A"
+    }
+   ]
+  }
+ ]
+}

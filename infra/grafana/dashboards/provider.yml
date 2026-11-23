@@ -1,0 +1,3 @@
+apiVersion: 1
+providers:
+  - { name: ipc, folder: IPC, type: file, options: { path: /etc/grafana/provisioning/dashboards } }
