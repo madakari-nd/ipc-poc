@@ -183,15 +183,15 @@ its own once Phase 2 is done.
 
 **Independent Test**: `npm run test:security` refuses every case V1–V5b through the Edge; `ledger:verify` passes, then detects a tampered record.
 
-- [ ] T058 [P] [US9] Write `tests/security/v1-evidence-read.sec.test.ts`: Hospital B requests a URL for Hospital A's evidence and gets 403 `SCOPE_DENIED`. The direct ELEVATE result is recorded from the 2026-10-23 log (research §4)
-- [ ] T059 [P] [US9] Write `tests/security/v2-scheduler.sec.test.ts`: the scheduler routes return 404 through the Edge, while the direct call returns 200
-- [ ] T060 [P] [US9] Write `tests/security/v3-targeting.sec.test.ts`: a body claiming another org is overridden, so no cross-org results come back. The direct call returns 4 solutions
-- [ ] T061 [P] [US9] Write `tests/security/v4-stale-replay.sec.test.ts`: a stale write gets 409 and a replayed key gets the stored response. The direct calls return 200 and are accepted
-- [ ] T062 [P] [US9] Write `tests/security/v5b-cross-write.sec.test.ts`: Hospital B writing into Hospital A's submission gets 403 `SCOPE_DENIED` (out of scope), while the direct call returns 200. A second case checks that a Hospital A frontline user writing to another owner's task gets 403 `NOT_OWNER`
-- [ ] T063 [P] [US9] Write `tests/security/ratelimit-headers.sec.test.ts`: a 429 after 120 requests per minute, plus the CSP, HSTS and cookie flags
-- [ ] T064 [US9] Write `scripts/security-report.ts`, which produces `docs/security-report.md` with both columns, through the Edge and direct (SC-002)
-- [ ] T065 [US9] Implement `services/workflow/src/routes/history.routes.ts` (entity history, plus `GET /ipc/v1/admin/ledger/verification` `verifyLedger` for the state admin) and the edge pass-through. Add `scripts/ledger-tamper-demo.ts`, which runs in the test profile only
-- [ ] T066 [US9] Build `apps/officer/src/features/history/HistoryTimeline.tsx`: every change on one screen, showing actor, role, time, reason and evidence fingerprints (SC-005)
+- [X] T058 [P] [US9] Write `tests/security/v1-evidence-read.sec.test.ts`: Hospital B requests a URL for Hospital A's evidence and gets 403 `SCOPE_DENIED`. The direct ELEVATE result is recorded from the 2026-10-23 log (research §4)
+- [X] T059 [P] [US9] Write `tests/security/v2-scheduler.sec.test.ts`: the scheduler routes return 404 through the Edge, while the direct call returns 200
+- [X] T060 [P] [US9] Write `tests/security/v3-targeting.sec.test.ts`: a body claiming another org is overridden, so no cross-org results come back. The direct call returns 4 solutions
+- [X] T061 [P] [US9] Write `tests/security/v4-stale-replay.sec.test.ts`: a stale write gets 409 and a replayed key gets the stored response. The direct calls return 200 and are accepted
+- [X] T062 [P] [US9] Write `tests/security/v5b-cross-write.sec.test.ts`: Hospital B writing into Hospital A's submission gets 403 `SCOPE_DENIED` (out of scope), while the direct call returns 200. A second case checks that a Hospital A frontline user writing to another owner's task gets 403 `NOT_OWNER`
+- [X] T063 [P] [US9] Write `tests/security/ratelimit-headers.sec.test.ts`: a 429 after 120 requests per minute, plus the CSP, HSTS and cookie flags
+- [X] T064 [US9] Write `scripts/security-report.ts`, which produces `docs/security-report.md` with both columns, through the Edge and direct (SC-002)
+- [X] T065 [US9] Implement `services/workflow/src/routes/history.routes.ts` (entity history, plus `GET /ipc/v1/admin/ledger/verification` `verifyLedger` for the state admin) and the edge pass-through. Add `scripts/ledger-tamper-demo.ts`, which runs in the test profile only
+- [X] T066 [US9] Build `apps/officer/src/features/history/HistoryTimeline.tsx`: every change on one screen, showing actor, role, time, reason and evidence fingerprints (SC-005)
 
 **Checkpoint**: the security suite is green and the report is generated.
 

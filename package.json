@@ -33,7 +33,9 @@
     "test:integration": "vitest run --project integration",
     "test:security": "vitest run --project security",
     "test:e2e": "playwright test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "ledger:tamper-demo": "tsx scripts/ledger-tamper-demo.ts",
+    "security:report": "tsx scripts/security-report.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
