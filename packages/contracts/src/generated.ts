@@ -1812,6 +1812,11 @@ export interface components {
             user: components["schemas"]["Me"];
             csrfToken: string;
             expiresAt: components["schemas"]["Timestamp"];
+            /**
+             * Format: byte
+             * @description Field client only (client=field). Random per-user salt (base64, 16+ bytes) that the field app feeds to PBKDF2 with the password to derive the AES-GCM key for its encrypted offline store (research T3). Stable for the user so data stays readable across sign-ins on the device.
+             */
+            offlineKeySalt?: string;
         };
         Me: {
             userId: components["schemas"]["UserId"];
@@ -1819,7 +1824,7 @@ export interface components {
             activeRole: components["schemas"]["Role"];
             assignments: components["schemas"]["ScopeAssignment"][];
             preferredLanguage: components["schemas"]["Language"];
-            csrfToken?: string;
+            csrfToken: string;
             sessionExpiresAt?: components["schemas"]["Timestamp"];
             smsConsent?: components["schemas"]["SmsConsent"];
             demoMode: boolean;
