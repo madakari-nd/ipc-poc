@@ -23,4 +23,10 @@ export default tseslint.config(
     rules: { ...reactHooks.configs.recommended.rules, ...jsxA11y.configs.strict.rules },
   },
   { files: ['scripts/**', 'tests/**'], rules: { 'no-console': 'off' } },
+  {
+    // k6 load scripts run in the k6 runtime, not Node: __ENV, __VU and the k6 module are globals.
+    files: ['tests/load/*.js'],
+    languageOptions: { globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly', __EXEC_SCENARIO: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
 );

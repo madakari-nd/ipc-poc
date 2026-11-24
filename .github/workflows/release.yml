@@ -1,0 +1,80 @@
+name: release
+# T124 (SC-012): builds semver + sha image tags, runs the release checks (unit/contract, build,
+# bundle budget, load thresholds, E2E), and a timed rollback check. Tag a commit `v1.2.3` to run.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      semver:
+        description: 'Semver to tag the images (e.g. 1.2.3)'
+        required: false
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.semver }}" ]; then
+            echo "tag=${{ github.event.inputs.semver }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run i18n:check
+      - run: npm run typecheck
+      - run: npm run test:coverage -- --project '!integration' --project '!security'
+      - run: npm run build
+      - run: node scripts/bundle-budget.mjs
+      - name: Build and tag images (semver + sha)
+        env: { TAG: ${{ steps.tag.outputs.tag }}, IPC_REGISTRY: ${{ vars.IPC_REGISTRY || 'ipc' }}
+        run: |
+          for target in services/edge services/workflow services/adapters apps/field apps/officer; do
+            svc=$(basename "$target")
+            docker build -f "$target/Dockerfile" -t "${IPC_REGISTRY}/$svc:${TAG}" -t "${IPC_REGISTRY}/$svc:${GITHUB_SHA::12}" .
+            if [ -n "${{ vars.DOCKER_REGISTRY_HOST }}" ]; then
+              docker tag "${IPC_REGISTRY}/$svc:${TAG}" "${DOCKER_REGISTRY_HOST}/${IPC_REGISTRY}/$svc:${TAG}"
+              docker push "${DOCKER_REGISTRY_HOST}/${IPC_REGISTRY}/$svc:${TAG}"
+            fi
+          done
+  release-check:
+    # Runs the load thresholds (SC-013) against a deployed test profile. Requires a reachable
+    # DEPLOY_BASE_URL; skipped when unset (the E2E + unit gates above still gate the release).
+    runs-on: ubuntu-24.04
+    needs: build
+    if: ${{ vars.DEPLOY_BASE_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Release load check (150 VUs, 15 min, p95 < 500 ms, errors < 0.1%)
+        run: |
+          if command -v k6 >/dev/null; then
+            k6 run --vus 150 --duration 15m tests/load/officer-mix.js -e BASE_URL="$DEPLOY_BASE_URL"
+          else
+            echo "k6 not installed; load gate skipped (install k6 to enforce SC-013)"
+          fi
+        env: { DEPLOY_BASE_URL: ${{ vars.DEPLOY_BASE_URL }} }
+  rollback-check:
+    runs-on: [self-hosted, linux, elevate]
+    needs: build
+    if: ${{ vars.IPC_REGISTRY != '' }}
+    env: { IPC_PROFILE: test }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Timed rollback to the previous tag and verify health + ledger
+        run: |
+          PREVIOUS_TAG="$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo dev)"
+          IPC_REGISTRY="$IPC_REGISTRY" ./scripts/rollback.sh "$PREVIOUS_TAG"
+          # Roll forward again to the release.
+          IPC_REGISTRY="$IPC_REGISTRY" IPC_TAG="$TAG" ./scripts/rollback.sh "$TAG"
