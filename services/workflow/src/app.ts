@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 import {
   correlation,
   healthRouter,
@@ -35,6 +35,9 @@ import type { ComparisonService } from './services/comparison.service.js';
 import type { ReleaseService } from './services/release.service.js';
 import { supportRoutes } from './routes/support.routes.js';
 import type { SupportService } from './services/support.service.js';
+import { escalationRoutes } from './routes/escalation.routes.js';
+import type { EscalationService } from './services/escalation.service.js';
+import type { NotificationService } from './services/notification.service.js';
 
 export interface AppDeps {
   logger: Logger;
@@ -58,6 +61,12 @@ export interface AppDeps {
   comparison?: { comparison: ComparisonService; release: ReleaseService };
   /** US6 expert support: mirrored `/ipc/v1/support-requests*` (ELEVATE mentoring facts come from the Edge). */
   support?: SupportService;
+  /** US5 escalations: mirrored `/ipc/v1/escalations*`, manual raise and demo sweep. */
+  escalations?: EscalationService;
+  /** US5 notifications: mirrored `/ipc/v1/notifications*` and SMS consent. */
+  notifications?: NotificationService;
+  /** US5 internal: scheduler `sweep` + demo `run-now` on the private network. */
+  escalationInternal?: Router;
 }
 
 /** Express app: platform middleware → /internal (service JWT) → health → problem+json errors. */
@@ -71,7 +80,8 @@ export function createApp(d: AppDeps): { app: Express; health: HealthRouter } {
   const health = healthRouter({ service: 'workflow', readiness: d.readiness, dependencies: d.dependencies });
   const register = d.admin ? registerRoutes(new RegisterController(d.admin.admin)) : undefined;
   app.use('/internal', internalRouter({ jwt: d.jwt, logger: d.logger, health, ledger: d.ledger, scope: d.scope, register,
-    ...(d.assessment ? { assessmentContext: assessmentContextRoutes(d.assessment, internalIdempotency({ logger: d.logger })) } : {}) }));
+    ...(d.assessment ? { assessmentContext: assessmentContextRoutes(d.assessment, internalIdempotency({ logger: d.logger })) } : {}),
+    ...(d.escalationInternal ? { escalations: d.escalationInternal } : {}) }));
   if (d.admin) {
     // Mirrored public routes: reachable only on the private network, with a service JWT (Edge).
     app.use('/ipc/v1', serviceJwtAuth(d.jwt), adminRoutes(new AdminController(d.admin.admin, d.admin.catalogue, d.scope, d.admin.clock)));
@@ -90,6 +100,10 @@ export function createApp(d: AppDeps): { app: Express; health: HealthRouter } {
   if (d.comparison) app.use(comparisonRoutes({ jwt: d.jwt, ...d.comparison, scope: d.scope }));
   // Mirrored public support routes (US6, T106/T107).
   if (d.support) app.use(supportRoutes({ jwt: d.jwt, support: d.support, scope: d.scope }));
+  // Mirrored public escalation + notification routes (US5, T100/T101).
+  if (d.escalations && d.admin) {
+    app.use(escalationRoutes({ jwt: d.jwt, escalations: d.escalations, notifications: d.notifications, scope: d.scope, clock: d.admin.clock }));
+  }
   // Root /healthz, /readyz (container healthcheck), /dependencies and /metrics (Prometheus) on the private network.
   app.use(health);
 

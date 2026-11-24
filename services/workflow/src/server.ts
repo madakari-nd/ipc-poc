@@ -16,6 +16,8 @@ import { TaskService } from './services/task.service.js';
 import { startConsumers } from './consumers/runner.js';
 import { OutboxPublisher } from './services/outbox.publisher.js';
 import { ElevateAdminGateway, UnconfiguredElevateAdmin } from './services/elevate-admin.gateway.js';
+import { internalEscalationRoutes } from './routes/internal/escalation.routes.js';
+import { createEmailSender } from './services/notification.email.js';
 
 const logger = createLogger('workflow');
 
@@ -46,6 +48,7 @@ async function main() {
     demoMode: cfg.DEMO_MODE,
     codePrefix: cfg.IPC_CODE_PREFIX,
     elevate: 'missing' in gateway ? new UnconfiguredElevateAdmin(gateway.missing) : gateway,
+    email: createEmailSender({ brokers: cfg.ELEVATE_KAFKA_BROKERS, topic: cfg.ELEVATE_NOTIFICATION_TOPIC, clientId: cfg.KAFKA_CLIENT_ID }),
   });
   await ctx.clock.refresh();
   const clockTimer = setInterval(() => {
@@ -72,6 +75,8 @@ async function main() {
   // US4: task execution; each state change triggers the same reconciliation (CLOSED → completed in ELEVATE).
   const tasks = new TaskService({ ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
   tasks.attachReconcile(planRt.reconcile);
+  // US5: on-return escalation hook (R3) commits inside the return transaction.
+  tasks.onReturn((e) => ctx.escalations.onReturn(e));
 
   const consumers = await startConsumers(kafka, createConsumers({ logger, orgId: cfg.ELEVATE_ORG_ID, ledger: ctx.ledger, plans: planRt.plans }), {
     groupId: cfg.IPC_CONSUMER_GROUP,
@@ -95,6 +100,14 @@ async function main() {
     support: new SupportService({ ledger: ctx.ledger, plans: planRt.plans, programmeNow: () => ctx.clock.programmeNow(), logger }),
     oversight: new OversightService({ edge: new HttpEdgeDq(cfg.EDGE_INTERNAL_URL, cfg.SERVICE_JWT_SECRET), programmeNow: () => ctx.clock.programmeNow() }),
     tasks,
+    escalationInternal: internalEscalationRoutes({
+      schedulerSecret: cfg.SCHEDULER_SHARED_SECRET,
+      escalations: ctx.escalations,
+      demoRunNowAllowed: () => ctx.clock.allowed,
+      jwt: { secret: cfg.SERVICE_JWT_SECRET, issuers: cfg.SERVICE_JWT_ISSUERS, audience: cfg.SERVICE_JWT_AUDIENCE },
+    }),
+    escalations: ctx.escalations,
+    notifications: ctx.notifications,
     comparison: {
       comparison: new ComparisonService({ assessment }),
       release: new ReleaseService({ assessment, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow() }),

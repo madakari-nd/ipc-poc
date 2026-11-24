@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { ImportService } from './importers/import.service.js';
 import { createImportModels } from './importers/job.js';
 import { ElevateImportClient, HttpRegisterClient } from './importers/ports.js';
+import { SmsStandin } from './sms/sms.standin.js';
 
 const logger = createLogger('adapters');
 
@@ -28,6 +29,13 @@ async function main() {
       logger,
     });
   }
+  // US5 SMS stand-in: consumes ipc.<profile>.notification.delivery (channel=sms), records consent +
+  // send + simulated receipt (FR-021). Uses the same Kafka broker as ELEVATE.
+  const sms = new SmsStandin(conn, {
+    kafka: { brokers: cfg.ELEVATE_KAFKA_BROKERS.split(',').map((s) => s.trim()).filter(Boolean), clientId: 'ipc-adapters-sms' },
+    profile: cfg.IPC_PROFILE,
+    logger,
+  });
   const { app, health } = createApp({
     logger,
     readiness: { mongo: async () => conn.readyState === 1 },
@@ -36,7 +44,7 @@ async function main() {
   const server = app.listen(cfg.PORT, () => logger.info({ port: cfg.PORT }, 'adapters listening'));
   installGracefulShutdown({
     server, logger, onDrainStart: () => health.setDraining(),
-    stopWorkers: async () => { await imports?.idle(); },
+    stopWorkers: async () => { await imports?.idle(); await sms.idle(); },
     closeStores: () => conn.close(),
   });
 }

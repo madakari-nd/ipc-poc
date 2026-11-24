@@ -19,15 +19,21 @@ export interface InternalRouterDeps {
   register?: Router;
   /** US2: `internalUpsertAssessmentContext` (PUT /internal/assessments/{elevateSubmissionId}/context). */
   assessmentContext?: Router;
+  /** US5: `internalEscalationSweep` (scheduler secret) + `internalEscalationRunNow` (demo). */
+  escalations?: Router;
 }
 
 /**
  * /internal (private network only; never routed by the Edge). Liveness and readiness are open so
- * the orchestrator can probe them; everything else needs a service JWT (deny by default).
+ * the orchestrator can probe them; the escalation sweep is open to the scheduler's static secret
+ * (V2); everything else needs a service JWT (deny by default).
  */
 export function internalRouter(d: InternalRouterDeps): Router {
   const r = Router();
   r.get(['/healthz', '/readyz'], d.health);
+  // US5 scheduler callback: static X-Scheduler-Secret, no JWT (security case V2). Mounted before the
+  // blanket service-JWT gate; the run-now route inside guards itself with a service JWT.
+  if (d.escalations) r.use(d.escalations);
   r.use(serviceJwtAuth(d.jwt));
   r.get('/dependencies', d.health);
   r.use(ledgerRoutes(new LedgerController(d.ledger), internalIdempotency({ logger: d.logger })));

@@ -39,6 +39,8 @@ export const workflowConfigSchema = z
     KAFKA_CLIENT_ID: z.string().min(1).default('ipc-workflow'),
     OUTBOX_POLL_MS: z.coerce.number().int().min(100).max(60_000).default(1000),
     OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(1000).default(20),
+    /** ELEVATE notification topic the notification service publishes email messages on (E13). */
+    ELEVATE_NOTIFICATION_TOPIC: z.string().min(1).default('dev.notifications'),
     // ---- ELEVATE admin calls (US1: checklist publish E5/E19, cycle plan solutions FR-018a). Optional:
     // without them those operations answer 503 ELEVATE_UNAVAILABLE naming the missing setting.
     ELEVATE_USER_URL: z.string().url().optional(),

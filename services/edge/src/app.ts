@@ -27,6 +27,7 @@ import { adminRoutes, type AdminGateways } from './routes/admin.routes.js';
 import { assessmentRoutes, type AssessmentRouteDeps } from './routes/assessments.routes.js';
 import { planRoutes } from './routes/plans.routes.js';
 import { taskRoutes } from './routes/tasks.routes.js';
+import { escalationRoutes } from './routes/escalation.routes.js';
 import { supportRoutes, type SupportRouteDeps } from './routes/support.routes.js';
 import { oversightRoutes } from './routes/oversight.routes.js';
 import { comparisonRoutes } from './routes/comparisons.routes.js';
@@ -200,6 +201,8 @@ export function createApps(deps: EdgeDeps) {
   // US4: task queues, transitions and history (evidence rule checked here against the locker).
   const taskForwarder = deps.tasks ?? planForwarder;
   if (taskForwarder) v1.use(taskRoutes(taskForwarder, guard, audit, models));
+  // US5: escalations (manual raise + list + demo sweep) and notifications, mirrored to workflow.
+  if (taskForwarder) v1.use(escalationRoutes(taskForwarder, guard, audit));
   const oversightForwarder = deps.oversight ?? deps.admin?.workflow;
   if (oversightForwarder) v1.use(oversightRoutes(oversightForwarder, audit));
   // US7: comparison, ward trend and release of held external results (mirrored to workflow).
