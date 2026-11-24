@@ -23,6 +23,7 @@
     "test:coverage": "vitest run --coverage",
     "contracts:gen": "npm run gen --workspace @ipc/contracts",
     "contracts:lint": "npm run lint --workspace @ipc/contracts",
+    "i18n:check": "tsx scripts/i18n-check.ts",
     "preflight": "tsx scripts/preflight.ts",
     "seed": "tsx scripts/seed.ts",
     "reset": "tsx scripts/reset.ts",

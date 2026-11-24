@@ -16,6 +16,7 @@ jobs:
       - run: npm run contracts:lint
       - run: npm run lint
       - run: npm run format:check
+      - run: npm run i18n:check
       - run: npm run build -w @ipc/contracts -w @ipc/platform -w @ipc/elevate-client -w @ipc/design-system
       - run: npm run typecheck
       - name: Unit + contract tests with coverage gate (Constitution XI)
