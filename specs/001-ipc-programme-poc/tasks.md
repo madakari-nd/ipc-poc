@@ -300,18 +300,18 @@ its own once Phase 2 is done.
 
 **Independent Test**: with the demo clock moved past 48 hours and then 7 days, R1 and R2 fire once each and the owner is unchanged.
 
-- [ ] T097 [P] [US5] Write unit tests `services/workflow/tests/domain/escalation.test.ts` covering R1, R2 and R3 (level above the decider), idempotency on (task, rule, level), a vacant target escalating to the next level up, and manual escalation
-- [ ] T098 [P] [US5] Write `tests/integration/escalation.int.test.ts`:
+- [X] T097 [P] [US5] Write unit tests `services/workflow/tests/domain/escalation.test.ts` covering R1, R2 and R3 (level above the decider), idempotency on (task, rule, level), a vacant target escalating to the next level up, and manual escalation
+- [X] T098 [P] [US5] Write `tests/integration/escalation.int.test.ts`:
   - the ELEVATE scheduler job calls `/internal/escalations/sweep` with the secret header
   - email reaches Mailpit through the notification Kafka topic, or SMTP as the fallback
-- [ ] T099 [US5] Write `services/workflow/src/domain/escalation.ts` and `services/escalation.service.ts`:
+- [X] T099 [US5] Write `services/workflow/src/domain/escalation.ts` and `services/escalation.service.ts`:
   - the sweep uses `programmeNow()`
   - there is an on-return hook and a manual raise
   - each escalation creates notifications and the `ipc.task.escalated` event
-- [ ] T100 [US5] Write `services/workflow/src/routes/internal/escalation.routes.ts`, which checks the `X-Scheduler-Secret` header. Add a demo "run now" route for the admin in demo mode, and register the hourly scheduler job at seed time (E12)
-- [ ] T101 [P] [US5] Write `services/workflow/src/services/notification.service.ts` for in-app notifications (stored, unread until read) and email through the ELEVATE notification client. Write `services/adapters/src/sms/sms.standin.ts` for consent, send, a simulated receipt and the `ipc.notification.delivery` event (FR-021)
-- [ ] T102 [P] [US5] Build `apps/officer/src/features/escalations/` (list and manual raise) and `src/features/notifications/` (bell and inbox). The field app gets a notifications inbox and the SMS consent toggle in profile
-- [ ] T103 [US5] Write the E2E test `tests/e2e/us5-escalation.spec.ts`. It moves the clock +3 days, runs the sweep, then +7 days and runs it again; it asserts the notifications, the Mailpit message, no duplicates and the owner unchanged. It includes an axe check
+- [X] T100 [US5] Write `services/workflow/src/routes/internal/escalation.routes.ts`, which checks the `X-Scheduler-Secret` header. Add a demo "run now" route for the admin in demo mode, and register the hourly scheduler job at seed time (E12)
+- [X] T101 [P] [US5] Write `services/workflow/src/services/notification.service.ts` for in-app notifications (stored, unread until read) and email through the ELEVATE notification client. Write `services/adapters/src/sms/sms.standin.ts` for consent, send, a simulated receipt and the `ipc.notification.delivery` event (FR-021)
+- [X] T102 [P] [US5] Build `apps/officer/src/features/escalations/` (list and manual raise) and `src/features/notifications/` (bell and inbox). The field app gets a notifications inbox and the SMS consent toggle in profile
+- [X] T103 [US5] Write the E2E test `tests/e2e/us5-escalation.spec.ts`. It moves the clock +3 days, runs the sweep, then +7 days and runs it again; it asserts the notifications, the Mailpit message, no duplicates and the owner unchanged. It includes an axe check
 
 ---
 
