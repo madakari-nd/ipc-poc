@@ -6,6 +6,7 @@ import { ImportService } from './importers/import.service.js';
 import { createImportModels } from './importers/job.js';
 import { ElevateImportClient, HttpRegisterClient } from './importers/ports.js';
 import { SmsStandin } from './sms/sms.standin.js';
+import { AnalyticsFeed } from './analytics/analytics.feed.js';
 
 const logger = createLogger('adapters');
 
@@ -36,6 +37,12 @@ async function main() {
     profile: cfg.IPC_PROFILE,
     logger,
   });
+  // T120: governed analytics extract — consumes every ipc.<profile>.* event, validates and stores it.
+  const analytics = new AnalyticsFeed(conn, {
+    kafka: { brokers: cfg.ELEVATE_KAFKA_BROKERS.split(',').map((s) => s.trim()).filter(Boolean), clientId: 'ipc-adapters-analytics' },
+    profile: cfg.IPC_PROFILE,
+    logger,
+  });
   const { app, health } = createApp({
     logger,
     readiness: { mongo: async () => conn.readyState === 1 },
@@ -44,7 +51,7 @@ async function main() {
   const server = app.listen(cfg.PORT, () => logger.info({ port: cfg.PORT }, 'adapters listening'));
   installGracefulShutdown({
     server, logger, onDrainStart: () => health.setDraining(),
-    stopWorkers: async () => { await imports?.idle(); await sms.idle(); },
+    stopWorkers: async () => { await imports?.idle(); await sms.idle(); await analytics.idle(); },
     closeStores: () => conn.close(),
   });
 }
