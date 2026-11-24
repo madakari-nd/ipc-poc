@@ -5,6 +5,7 @@ import { boundaryStatus, useStateMessages } from '../../lib/boundary.js';
 import type { Role } from '../../lib/types.js';
 import { useDate, useLocalized } from '../plans/format.js';
 import { ACCEPT_REASONS, RETURN_REASONS, reviewErrorKey, useTask, useTaskHistory, useTaskWrite, useWardPeople, type Task, type TaskWrite } from './api.js';
+import { useRaiseManualEscalation } from '../escalations/api.js';
 import { EvidenceCard } from './EvidenceViewer.js';
 import { useReasonLabels, useReasonOptions } from './labels.js';
 
@@ -93,6 +94,37 @@ function BlockDialog({ task, open, onOpenChange, onDone }: { task: Task; open: b
   );
 }
 
+/** US5 manual escalation (FR-020): a supervisor flags a blocker and raises it to the IPC officer. */
+function EscalateDialog({ taskId, open, onOpenChange, onDone }: { taskId: string; open: boolean; onOpenChange: (o: boolean) => void; onDone: () => void }) {
+  const { t } = useTranslation();
+  const raise = useRaiseManualEscalation();
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('review.escalate.title')}
+      description={t('review.escalate.description')}
+      closeLabel={t('common.close')}
+      footer={
+        <Button
+          variant="danger"
+          disabled={raise.isPending}
+          onClick={() => {
+            if (!reason.trim()) return setError(true);
+            raise.mutate({ taskId, reason: reason.trim() }, { onSuccess: onDone });
+          }}
+        >
+          {t('review.escalate.confirm')}
+        </Button>
+      }
+    >
+      <Field label={t('review.escalate.reason')} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} error={error ? t('review.reasonTextRequired') : undefined} />
+    </Dialog>
+  );
+}
+
 /**
  * Review of one task (US4): details, the proof with its metadata and signed-URL viewer, the
  * supervisor's Accept / Return, the IPC officer's or DQM's Validate / Return (FR-014 reason list),
@@ -112,6 +144,7 @@ export function TaskReview({ taskId, role }: { taskId: string; role: Role }) {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [reassign, setReassign] = useState(false);
   const [block, setBlock] = useState(false);
+  const [escalate, setEscalate] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   const run = async (w: TaskWrite, done: string) => {
@@ -180,6 +213,7 @@ export function TaskReview({ taskId, role }: { taskId: string; role: Role }) {
               {decide && <Button variant="danger" onClick={() => setConfirm(supervisor ? 'return' : 'validation_return')}>{t('review.return.open')}</Button>}
               {supervisor && open && <Button variant="secondary" onClick={() => setReassign(true)}>{t('review.reassign.open')}</Button>}
               {supervisor && open && <Button variant="secondary" onClick={() => setBlock(true)}>{task.blocked ? t('review.block.clear') : t('review.block.open')}</Button>}
+              {supervisor && open && <Button variant="secondary" onClick={() => setEscalate(true)}>{t('review.escalate.open')}</Button>}
             </div>
           )}
 
@@ -197,6 +231,10 @@ export function TaskReview({ taskId, role }: { taskId: string; role: Role }) {
           )}
           <ReassignDialog task={task} open={reassign} onOpenChange={setReassign} onDone={(w) => run(w, t('review.reassign.done'))} />
           <BlockDialog key={String(!!task.blocked)} task={task} open={block} onOpenChange={setBlock} onDone={(w) => run(w, t('review.block.done'))} />
+          <EscalateDialog taskId={task.id} open={escalate} onOpenChange={setEscalate} onDone={() => {
+            setEscalate(false);
+            toast.show({ tone: 'success', title: t('review.escalate.done') });
+          }} />
 
           <History taskId={task.id} />
         </article>

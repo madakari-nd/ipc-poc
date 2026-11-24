@@ -8,6 +8,7 @@
     "reviews": "Review queue",
     "assessments": "Assessments",
     "queue": "Sync queue",
+    "notifications": "Notifications",
     "signOut": "Sign out",
     "language": "Language"
   },
@@ -287,6 +288,23 @@
       "start": "Start: {{title}}",
       "photo": "Proof photo: {{title}}",
       "submit": "Proof for: {{title}}"
+    }
+  },
+  "notifications": {
+    "markRead": "Mark as read",
+    "list": {
+      "emptyTitle": "No notifications",
+      "emptyDescription": "You have no notifications yet."
+    },
+    "templates": {
+      "task": {
+        "escalated": "A task needs attention"
+      }
+    },
+    "sms": {
+      "title": "SMS alerts",
+      "description": "Give permission to send you SMS alerts about tasks that need you. In this pilot SMS is demonstrated, not sent by a provider.",
+      "consentLabel": "I agree to receive SMS alerts"
     }
   },
   "reasons": {

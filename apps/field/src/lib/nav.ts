@@ -1,7 +1,7 @@
 import type { HomeCardKind, Role } from './types.js';
 
 /** Sections of the field app. Home and the sync queue are built; the others arrive with their journeys. */
-export type Section = 'home' | 'tasks' | 'reviews' | 'assessments' | 'queue';
+export type Section = 'home' | 'tasks' | 'reviews' | 'assessments' | 'queue' | 'notifications';
 
 export interface NavItem {
   section: Section;
@@ -17,10 +17,10 @@ const item = (section: Section): NavItem => ({
 
 /** FR-036: field roles are frontline staff, ward supervisor, IPC officer and external auditor. */
 export const FIELD_NAV: Partial<Record<Role, NavItem[]>> = {
-  FRONTLINE: [item('home'), item('tasks'), item('queue')],
-  WARD_SUPERVISOR: [item('home'), item('reviews'), item('tasks'), item('queue')],
-  IPC_OFFICER: [item('home'), item('assessments'), item('queue')],
-  EXTERNAL_AUDITOR: [item('home'), item('assessments'), item('queue')],
+  FRONTLINE: [item('home'), item('tasks'), item('queue'), item('notifications')],
+  WARD_SUPERVISOR: [item('home'), item('reviews'), item('tasks'), item('queue'), item('notifications')],
+  IPC_OFFICER: [item('home'), item('assessments'), item('queue'), item('notifications')],
+  EXTERNAL_AUDITOR: [item('home'), item('assessments'), item('queue'), item('notifications')],
 };
 
 export function navFor(role: Role): NavItem[] {

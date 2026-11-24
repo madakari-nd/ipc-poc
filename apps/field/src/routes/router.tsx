@@ -10,6 +10,7 @@ import { NotFoundRoute } from './NotFoundRoute.js';
 import { QueueRoute } from './QueueRoute.js';
 import { SectionRoute } from './SectionRoute.js';
 import { TaskRoute, TasksRoute } from './TasksRoute.js';
+import { NotificationsRoute } from '../features/notifications/NotificationsRoute.js';
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter(
             { path: 'assessments/:assessmentId', element: <AssessmentFormRoute /> },
             { path: 'tasks', element: <TasksRoute /> },
             { path: 'tasks/:taskId', element: <TaskRoute /> },
+            { path: 'notifications', element: <NotificationsRoute /> },
             { path: ':section', element: <SectionRoute /> },
             { path: '*', element: <NotFoundRoute /> },
           ],

@@ -1004,6 +1004,14 @@
       "confirm": "Flag as blocked",
       "done": "Blocked flag updated."
     },
+    "escalate": {
+      "open": "Raise escalation",
+      "title": "Raise this task",
+      "description": "Escalate this blocker to the IPC officer. The task owner and history are unchanged.",
+      "reason": "Reason",
+      "confirm": "Raise escalation",
+      "done": "Escalation raised."
+    },
     "evidence": {
       "title": "Proof",
       "none": "No proof submitted yet.",
