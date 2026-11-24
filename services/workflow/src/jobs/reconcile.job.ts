@@ -51,7 +51,10 @@ export class ReconcileJob {
     if (diff.corrections.length === 0 && stale.length === 0) return 0;
     await withTx(async (s) => {
       for (const t of stale) {
-        await TaskModel.updateOne({ _id: t._id }, { $set: { syncState: 'in_sync', elevateTaskId: diff.links[String(t._id)] }, $inc: { v: 1 } }, { session: s });
+        // ELEVATE link + sync state are system bookkeeping, not a user-visible change: the version
+        // (If-Match) is NOT bumped, so clients holding the task never get a spurious 409. The match on
+        // `v` skips a task that moved on since it was read; its own trigger reconciles it again.
+        await TaskModel.updateOne({ _id: t._id, v: t.v }, { $set: { syncState: 'in_sync', elevateTaskId: diff.links[String(t._id)] } }, { session: s });
       }
       for (const c of diff.corrections) {
         await this.d.ledger.append({

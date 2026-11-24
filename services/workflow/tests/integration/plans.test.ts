@@ -200,6 +200,43 @@ describe('observation-completed consumer (T084)', () => {
   });
 });
 
+describe('external-auditor completions (FR-024a, A12)', () => {
+  /** The external auditor's assessment context, as US2 start creates it (held for release). */
+  async function externalContext(submissionId: string) {
+    await AssessmentContextModel.create({
+      elevateObservationId: 'obs-ext', elevateSubmissionId: submissionId, submissionNumber: 1, wardId: W4, facilityId: FA, cycleId: C1,
+      checklistVersionId: CL, assessorUserId: '90', assessorType: 'external', isBaselineForCycle: true, status: 'submitted',
+      failedQuestionKeys: [], releaseState: 'held', evidenceIds: [], v: 1,
+    });
+  }
+
+  it('never drafts a plan from an external result, even with a critical failure; the outcome is ledgered', async () => {
+    const id = new Types.ObjectId().toHexString();
+    await externalContext(id);
+    expect(await consumer!.process(completion({ id }))).toBe('processed');
+    expect(await PlanModel.countDocuments()).toBe(0);
+    const doc = await AssessmentContextModel.findOne({ elevateSubmissionId: id }).lean();
+    expect(doc).toMatchObject({ status: 'completed', assessorType: 'external', releaseState: 'held', isBaselineForCycle: false, failedQuestionKeys: ['hand_rub_at_bed'] });
+    expect(await LedgerRecordModel.findOne({ action: 'plan.not_created', 'subject.id': String(doc!._id) }).lean())
+      .toMatchObject({ reason: expect.stringMatching(/external/i) });
+    expect(await LedgerRecordModel.countDocuments({ action: 'plan.drafted' })).toBe(0);
+  });
+
+  it('an earlier external result does not block the internal draft, and its findings stay out of the plan', async () => {
+    const id = new Types.ObjectId().toHexString();
+    await externalContext(id);
+    await consumer!.process(completion({ id, pass: { waste_segregation: false } }));
+    expect(await consumer!.process(completion())).toBe('processed');
+    expect(await PlanModel.countDocuments()).toBe(1);
+    const plan = await latestDraft();
+    const internal = await AssessmentContextModel.findById(plan!.sourceAssessmentId).lean();
+    expect(internal).toMatchObject({ assessorType: 'internal', isBaselineForCycle: true });
+    const res = await request(app).get(`/ipc/v1/plans/${String(plan!._id)}`).set('authorization', await as('officerA', 'IPC_OFFICER'));
+    expect(res.status).toBe(200);
+    expect(res.body.unplannedFindings).toEqual([]);
+  });
+});
+
 describe('plan routes (T085, T087)', () => {
   async function draftId() {
     await consumer!.process(completion({ pass: { waste_segregation: false } }));
@@ -331,6 +368,40 @@ describe('plan routes (T085, T087)', () => {
     const recs = await LedgerRecordModel.find({ action: 'reconcile.corrected' }).lean();
     expect(recs.map((r) => r.actor)).toEqual([{ userId: 'system', role: 'SYSTEM' }, { userId: 'system', role: 'SYSTEM' }]);
     expect(await TaskModel.findOne().lean()).toMatchObject({ state: 'ASSIGNED' });
+  });
+
+  it('reconcile links and syncs tasks without bumping the user-facing version (no spurious 409s)', async () => {
+    const id = await draftId();
+    const officer = await as('officerA', 'IPC_OFFICER');
+    await request(app).patch(`/ipc/v1/plans/${id}`).set('authorization', officer).set('if-match', '"0"')
+      .send({ tasks: [{ taskKey: 'fit-hand-rub-dispensers', ownerUserId: 'front1' }, { taskKey: 'segregate-waste-at-source', included: false }] });
+    await request(app).post(`/ipc/v1/plans/${id}/approval`).set('authorization', officer).set('if-match', '"1"');
+    await rt.reconcile.idle();
+    const [task] = await TaskModel.find().lean();
+    // simulate a reopened / newly added task: pending, not yet linked, at the version the client holds
+    await TaskModel.updateOne({ _id: task!._id }, { $set: { syncState: 'pending', v: 3 }, $unset: { elevateTaskId: 1 } });
+    await rt.reconcile.reconcilePlan(id);
+    const after = await TaskModel.findById(task!._id).lean();
+    expect(after).toMatchObject({ syncState: 'in_sync', elevateTaskId: task!.elevateTaskId, v: 3 });
+  });
+
+  it('reconcile never overwrites a task that changed after it was read', async () => {
+    const id = await draftId();
+    const officer = await as('officerA', 'IPC_OFFICER');
+    await request(app).patch(`/ipc/v1/plans/${id}`).set('authorization', officer).set('if-match', '"0"')
+      .send({ tasks: [{ taskKey: 'fit-hand-rub-dispensers', ownerUserId: 'front1' }, { taskKey: 'segregate-waste-at-source', included: false }] });
+    await request(app).post(`/ipc/v1/plans/${id}/approval`).set('authorization', officer).set('if-match', '"1"');
+    await rt.reconcile.idle();
+    const [task] = await TaskModel.find().lean();
+    await TaskModel.updateOne({ _id: task!._id }, { $set: { syncState: 'pending', v: 3 } });
+    // a transition lands while ELEVATE is being read: the task moves on (v 4, still pending)
+    const original = elevate.projectTasks.bind(elevate);
+    elevate.projectTasks = async (o: string, p: string) => {
+      await TaskModel.updateOne({ _id: task!._id }, { $set: { state: 'IN_PROGRESS', syncState: 'pending' }, $inc: { v: 1 } });
+      return original(o, p);
+    };
+    await rt.reconcile.reconcilePlan(id);
+    expect(await TaskModel.findById(task!._id).lean()).toMatchObject({ state: 'IN_PROGRESS', syncState: 'pending', v: 4 });
   });
 
   it('a repeat cycle drafts a new plan and links the open tasks of the previous plan (AS5, FR-018)', async () => {

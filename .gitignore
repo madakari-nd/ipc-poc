@@ -17,3 +17,4 @@ infra/caddy/data/
 infra/compose/.seed-state.*
 tests/security/results/
 infra/s3/s3.*.json
+.claude/settings.local.json

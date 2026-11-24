@@ -3,6 +3,7 @@ import {
   applyDraftUpdate,
   assertApprovable,
   carryOverTaskIds,
+  countsForPlanning,
   decideDraft,
   diffProjectTasks,
   elevateStatusOf,
@@ -116,6 +117,25 @@ describe('decideDraft (FR-011, FR-018)', () => {
     const d = decideDraft({ questions: QUESTIONS, failedQuestionKeys: ['hand_rub_at_bed'], firstInCycle: false, riskDefaults: RISK_DEFAULTS, now: NOW });
     expect(d.outcome).toBe('same_cycle_no_plan');
     expect(d.draftTasks).toEqual([]);
+  });
+
+  it('an external-auditor result never drafts a plan, even first in the cycle with critical failures (FR-024a, A12)', () => {
+    const d = decideDraft({
+      questions: QUESTIONS, failedQuestionKeys: ['hand_rub_at_bed', 'waste_segregation'], firstInCycle: true, riskDefaults: RISK_DEFAULTS, now: NOW,
+      assessorType: 'external', previousPlanTasks: [{ id: '65c000000000000000000001', state: 'IN_PROGRESS' }],
+    });
+    expect(d).toEqual({ outcome: 'external_result_no_plan', draftTasks: [], carriedOverTaskIds: [] });
+  });
+
+  it('internal results (explicit or by default) still draft', () => {
+    const base = { questions: QUESTIONS, failedQuestionKeys: ['hand_rub_at_bed'], firstInCycle: true, riskDefaults: RISK_DEFAULTS, now: NOW };
+    expect(decideDraft({ ...base, assessorType: 'internal' }).outcome).toBe('draft_plan_created');
+    expect(decideDraft(base).outcome).toBe('draft_plan_created');
+  });
+
+  it('countsForPlanning: only internal results drive plans and same-cycle checks', () => {
+    expect(countsForPlanning({ assessorType: 'internal' })).toBe(true);
+    expect(countsForPlanning({ assessorType: 'external' })).toBe(false);
   });
 
   it('a repeat cycle gives a new draft and links (not copies) the open tasks of the previous plan', () => {

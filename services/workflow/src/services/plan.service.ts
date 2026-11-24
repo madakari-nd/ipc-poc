@@ -11,6 +11,7 @@ import {
   applyDraftUpdate, assertApprovable, decideDraft, diffProjectTasks, humanizeKey, nextRevision, planRevisionChanges,
   type CatalogueQuestionLike, type DraftDecision, type DraftTask, type RevisionChange,
 } from '../domain/plan.js';
+import type { AssessorType } from '../domain/assessment.js';
 import type { RiskLevel } from '../domain/catalogue.js';
 import type { LedgerService } from '../ledger/ledger.service.js';
 import { withTx } from '../repositories/tx.js';
@@ -110,6 +111,8 @@ export interface CompletionInput {
   checklist: ChecklistVersion;
   failedQuestionKeys: string[];
   firstInCycle: boolean;
+  /** External-auditor results never draft a plan (FR-024a, A12). Defaults to the assessment's own. */
+  assessorType?: AssessorType;
 }
 
 /**
@@ -164,10 +167,13 @@ export class PlanService {
       templateTasks: (i.checklist.planTemplate?.tasks ?? []).map((t) => ({ templateTaskKey: t.templateTaskKey, title: { en: t.title.en ?? humanizeKey(t.templateTaskKey), ...t.title } })),
       now: this.d.programmeNow(),
       previousPlanTasks: previousTasks,
+      assessorType: i.assessorType ?? i.assessment.assessorType,
     });
     const subject = { type: 'assessment' as const, id: String(i.assessment._id) };
     if (decision.outcome !== 'draft_plan_created') {
-      const reason = decision.outcome === 'no_actions_needed' ? 'No failed questions: no actions needed, no plan' : 'Later assessment in the same cycle: no new plan';
+      const reason = decision.outcome === 'external_result_no_plan'
+        ? 'External-auditor result: for comparison and release only, no plan'
+        : decision.outcome === 'no_actions_needed' ? 'No failed questions: no actions needed, no plan' : 'Later assessment in the same cycle: no new plan';
       await this.d.ledger.append({ actor: SYSTEM, action: 'plan.not_created', subject, reason }, session);
       return decision;
     }
@@ -266,6 +272,8 @@ export class PlanService {
       : [];
     const others = await AssessmentContextModel.find({
       wardId: plan.wardId, cycleId: plan.cycleId, status: 'completed', _id: { $ne: plan.sourceAssessmentId },
+      // external-auditor findings never reach a hospital plan (FR-024a, A12)
+      assessorType: { $ne: 'external' },
     }, { failedQuestionKeys: 1 }).lean<AssessmentContext[]>();
     const planned = new Set([...(plan.draftTasks ?? []).map((t) => t.sourceQuestionKey), ...own.map((t) => t.sourceQuestionKey)].filter(Boolean));
     const checklist = await this.checklistOf(plan.sourceAssessmentId);

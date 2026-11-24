@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Problem } from '@ipc/platform';
+import type { AssessorType } from './assessment.js';
 import { rootExternalId, type RiskLevel } from './catalogue.js';
 
 /**
@@ -13,7 +14,16 @@ const DAY_MS = 86_400_000;
 export type TaskStateName =
   | 'ASSIGNED' | 'IN_PROGRESS' | 'EVIDENCE_SUBMITTED' | 'CHANGES_REQUESTED' | 'VERIFIED' | 'PENDING_VALIDATION' | 'CLOSED';
 
-export type PlanOutcome = 'draft_plan_created' | 'no_actions_needed' | 'same_cycle_no_plan';
+export type PlanOutcome = 'draft_plan_created' | 'no_actions_needed' | 'same_cycle_no_plan' | 'external_result_no_plan';
+
+/**
+ * Only internal (hospital) results drive improvement plans. External-auditor results exist for
+ * comparison and release only (FR-024a, proposal A12): they never draft a plan, never count as the
+ * first assessment of a cycle and never offer findings to a hospital plan.
+ */
+export function countsForPlanning(a: { assessorType: AssessorType }): boolean {
+  return a.assessorType !== 'external';
+}
 
 export interface LocalizedTitle { en: string; hi?: string; kn?: string }
 
@@ -163,6 +173,7 @@ export interface DraftDecision {
 
 /**
  * What a completed assessment produces (FR-011, FR-018, US3 AS1/4/5/7):
+ * - an external-auditor result → never a plan (FR-024a, A12);
  * - a later assessment in the same cycle → no plan (its findings may be added by revision);
  * - no failed questions → no plan ("no actions needed"); open tasks stay on the previous plan;
  * - otherwise one draft: the mapped template task per failed question, defaults from its risk level.
@@ -175,7 +186,10 @@ export function decideDraft(i: {
   templateTasks?: { templateTaskKey: string; title: LocalizedTitle }[];
   now: Date;
   previousPlanTasks?: { id: string; state: TaskStateName }[];
+  /** Defaults to `internal`. */
+  assessorType?: AssessorType;
 }): DraftDecision {
+  if (!countsForPlanning({ assessorType: i.assessorType ?? 'internal' })) return { outcome: 'external_result_no_plan', draftTasks: [], carriedOverTaskIds: [] };
   if (!i.firstInCycle) return { outcome: 'same_cycle_no_plan', draftTasks: [], carriedOverTaskIds: [] };
   const failed = new Set(i.failedQuestionKeys);
   const questions = i.questions.filter((q) => failed.has(q.questionKey));

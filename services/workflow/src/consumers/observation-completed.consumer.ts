@@ -6,7 +6,7 @@ import {
   AssessmentContextModel, ChecklistVersionModel, CycleModel, PlanModel, WardModel,
   type AssessmentContext, type ChecklistVersion, type Cycle, type Ward,
 } from '../domain/models/index.js';
-import { scoreSubmission, type CatalogueQuestionLike, type EventAnswer } from '../domain/plan.js';
+import { countsForPlanning, scoreSubmission, type CatalogueQuestionLike, type EventAnswer } from '../domain/plan.js';
 import type { LedgerService } from '../ledger/ledger.service.js';
 import type { PlanService } from '../services/plan.service.js';
 import { BaseConsumer, type ConsumerDeps } from './base.consumer.js';
@@ -80,12 +80,15 @@ export class ObservationCompletedConsumer extends BaseConsumer<Completed | { sta
 
     const score = scoreSubmission(checklist.questions as CatalogueQuestionLike[], (e.answers ?? {}) as Record<string, EventAnswer>, { eventScored: eventHasScores(e) });
     const completedAt = new Date(e.completedDate ?? e.ratingCompletedAt ?? Date.now());
-    // First completed assessment of the ward in the cycle, and no plan yet for (ward, cycle) (FR-011).
+    // External-auditor results are for comparison and release only (FR-024a, A12): never a plan,
+    // never the cycle's first assessment. A completion without a context is a hospital submission.
+    const internal = countsForPlanning({ assessorType: ctx?.assessorType ?? 'internal' });
+    // First completed INTERNAL assessment of the ward in the cycle, and no plan yet for (ward, cycle) (FR-011).
     const earlier = await AssessmentContextModel.exists({
-      wardId: ward._id, cycleId: cycle._id, status: 'completed', ...(ctx ? { _id: { $ne: ctx._id } } : {}),
+      wardId: ward._id, cycleId: cycle._id, status: 'completed', assessorType: { $ne: 'external' }, ...(ctx ? { _id: { $ne: ctx._id } } : {}),
     }).session(s);
     const planned = await PlanModel.exists({ wardId: ward._id, cycleId: cycle._id, status: { $in: ['draft', 'active', 'closed'] } }).session(s);
-    const firstInCycle = !earlier && !planned;
+    const firstInCycle = internal && !earlier && !planned;
 
     const result = {
       status: 'completed' as const, completedAt: ctx?.completedAt ?? completedAt, isBaselineForCycle: firstInCycle,
@@ -110,7 +113,7 @@ export class ObservationCompletedConsumer extends BaseConsumer<Completed | { sta
         beforeHash: contentHash(before), afterHash: contentHash(result) }, s);
     }
 
-    const out = await this.o.plans.draftFromCompletion({ assessment: ctx, ward, cycle, checklist, failedQuestionKeys: score.failedQuestionKeys, firstInCycle }, s);
+    const out = await this.o.plans.draftFromCompletion({ assessment: ctx, ward, cycle, checklist, failedQuestionKeys: score.failedQuestionKeys, firstInCycle, assessorType: ctx.assessorType }, s);
     this.o.logger.info({ submission: e._id, ward: String(ward._id), outcome: out.outcome, planId: out.planId, scores: score.source }, 'assessment completion processed');
   }
 }
