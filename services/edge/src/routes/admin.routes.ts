@@ -186,6 +186,8 @@ export function adminRoutes(g: AdminGateways): Router {
   r.get('/admin/escalation-rules', wf);
   r.post('/admin/escalation-rules', wf);
   r.patch('/admin/escalation-rules/:ruleCode', wf);
+  r.get('/admin/retention-policy', wf);
+  r.put('/admin/retention-policy', wf);
   r.get('/demo/clock', wf);
   r.put('/demo/clock', wf);
   r.post('/demo/clock/reset', wf);

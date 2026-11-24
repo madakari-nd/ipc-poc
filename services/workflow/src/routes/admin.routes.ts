@@ -28,6 +28,8 @@ export function adminRoutes(c: AdminController): Router {
   r.get('/admin/escalation-rules', c.listEscalationRules);
   r.post('/admin/escalation-rules', c.createEscalationRule);
   r.patch('/admin/escalation-rules/:ruleCode', c.updateEscalationRule);
+  r.get('/admin/retention-policy', c.getRetentionPolicy);
+  r.put('/admin/retention-policy', c.setRetentionPolicy);
   r.get('/demo/clock', c.getClock);
   r.put('/demo/clock', c.setClock);
   r.post('/demo/clock/reset', c.resetClock);

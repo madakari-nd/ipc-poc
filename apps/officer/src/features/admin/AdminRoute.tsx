@@ -9,8 +9,9 @@ import { DemoClockPanel } from './DemoClock.js';
 import { ImportsPanel } from './ImportsPanel.js';
 import { EscalationRulesPanel, RiskDefaultsPanel } from './RulesPanels.js';
 import { ScopesPanel } from './ScopesPanel.js';
+import { RetentionPanel } from './RetentionPanel.js';
 
-export const ADMIN_TABS = ['imports', 'users', 'cycles', 'risk-defaults', 'escalation-rules', 'demo-clock'] as const;
+export const ADMIN_TABS = ['imports', 'users', 'cycles', 'risk-defaults', 'escalation-rules', 'retention', 'demo-clock'] as const;
 type Tab = (typeof ADMIN_TABS)[number];
 
 const PANELS: Record<Tab, () => JSX.Element> = {
@@ -19,6 +20,7 @@ const PANELS: Record<Tab, () => JSX.Element> = {
   cycles: CyclesPanel,
   'risk-defaults': RiskDefaultsPanel,
   'escalation-rules': EscalationRulesPanel,
+  retention: RetentionPanel,
   'demo-clock': DemoClockPanel,
 };
 

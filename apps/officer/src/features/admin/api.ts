@@ -9,6 +9,7 @@ export type Cycle = S['Cycle'];
 export type ChecklistVersion = S['ChecklistVersion'];
 export type RiskDefault = S['RiskDefault'];
 export type EscalationRule = S['EscalationRule'];
+export type RetentionPolicy = S['RetentionPolicy'];
 export type DemoClock = S['DemoClock'];
 export type Facility = S['Facility'];
 export type RiskLevel = S['RiskLevel'];
@@ -23,6 +24,7 @@ export const KEYS = {
   checklist: (id: string) => ['checklists', id] as const,
   risk: ['admin', 'risk-defaults'] as const,
   rules: ['admin', 'escalation-rules'] as const,
+  retention: ['admin', 'retention-policy'] as const,
   clock: ['demo', 'clock'] as const,
   facilities: ['facilities'] as const,
   importJob: (id: string) => ['admin', 'imports', id] as const,
@@ -36,6 +38,7 @@ export const useChecklist = (id: string | undefined) =>
   useQuery({ queryKey: KEYS.checklist(id ?? ''), queryFn: () => apiRequest<ChecklistVersion>(`/ipc/v1/checklists/${id}`), enabled: !!id });
 export const useRiskDefaults = () => useQuery({ queryKey: KEYS.risk, queryFn: () => apiRequest<{ items: RiskDefault[] }>('/ipc/v1/admin/risk-defaults') });
 export const useEscalationRules = () => useQuery({ queryKey: KEYS.rules, queryFn: () => apiRequest<{ items: EscalationRule[] }>('/ipc/v1/admin/escalation-rules') });
+export const useRetentionPolicy = () => useQuery({ queryKey: KEYS.retention, queryFn: () => apiRequest<RetentionPolicy>('/ipc/v1/admin/retention-policy') });
 export const useFacilities = () => useQuery({ queryKey: KEYS.facilities, queryFn: () => apiRequest<Page<Facility>>('/ipc/v1/facilities?limit=100') });
 export const useDemoClock = (enabled = true) =>
   useQuery({ queryKey: KEYS.clock, queryFn: () => apiRequest<DemoClock>('/ipc/v1/demo/clock'), enabled, refetchInterval: 60_000 });

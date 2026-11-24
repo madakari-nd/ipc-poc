@@ -27,6 +27,7 @@ import type { CatalogueService } from './catalogue.service.js';
 import type { ElevateAdminPort } from './elevate-admin.gateway.js';
 import { decodeCursor, encodeCursor, type Page } from './paging.js';
 import { toScopeAssignmentDto, type ScopeAssignmentDto, type ScopeService } from './scope.service.js';
+import type { RetentionService } from './retention.service.js';
 
 const iso = (d?: Date | null) => (d ? d.toISOString() : undefined);
 const meta = (d: { _id: Types.ObjectId; v: number; createdAt: Date; updatedAt: Date }) => ({
@@ -137,6 +138,8 @@ export class AdminService {
       /** Real time for scope validity (access control never follows the demo clock). */
       now?: () => Date;
       checklistCode?: string;
+      /** T128 retention policy get/set/scan. */
+      retention?: RetentionService;
     },
   ) {}
 
@@ -558,6 +561,24 @@ export class AdminService {
       }, session);
       return dto;
     });
+  }
+
+  // ---------------------------------------------------------------- retention policy (T128, NFR-010)
+  private retention(): RetentionService {
+    if (!this.d.retention) throw new Problem(503, 'ELEVATE_UNAVAILABLE', 'Retention is not configured');
+    return this.d.retention;
+  }
+  /** getRetentionPolicy. */
+  async getRetentionPolicy() {
+    return this.retention().get();
+  }
+
+  /** setRetentionPolicy: save + ledger `retention.changed` (If-Match). */
+  async setRetentionPolicy(input: {
+    evidenceYearsAfterPlanClosure: number; auditYears: number; otherYearsAfterProgrammeEnd: number;
+    purgeMode: 'dry_run' | 'enforce'; reason?: string;
+  }, ifMatch: number | undefined, actor: LedgerActor) {
+    return this.retention().set(input, ifMatch, actor);
   }
 
   // ---------------------------------------------------------------- escalation rules

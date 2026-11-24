@@ -76,6 +76,13 @@ const schemas = {
   ruleCreate: z.object({ code: z.string().regex(/^R[0-9]{1,3}$/), condition, target, channels, active: z.boolean().optional() }).strict(),
   ruleUpdate: z.object({ condition: condition.optional(), target: target.optional(), channels: channels.optional(), active: z.boolean().optional(), reason: z.string().max(500).optional() }).strict()
     .refine((o) => Object.keys(o).length > 0, 'at least one field'),
+  retentionPolicy: z.object({
+    evidenceYearsAfterPlanClosure: z.number().int().min(1).max(50),
+    auditYears: z.number().int().min(1).max(50),
+    otherYearsAfterProgrammeEnd: z.number().int().min(1).max(50),
+    purgeMode: z.enum(['dry_run', 'enforce']),
+    reason: z.string().max(500).optional(),
+  }).strict(),
   clockSet: z.object({ programmeNow: ts.optional(), advanceBy: z.string().max(32).optional(), reason: z.string().max(500).optional() }).strict(),
   clockReset: z.object({ reason: z.string().max(500).optional() }).strict(),
   pageQuery: z.object({ cursor, limit }).passthrough(),
@@ -224,6 +231,16 @@ export class AdminController {
     const actor = actorOf(res, ADMIN);
     const level = parseOrThrow(riskLevel, req.params.riskLevel);
     send(res, 200, await this.admin.setRiskDefault(level, parseOrThrow(schemas.riskDefault, req.body), ifMatchOf(req), actor));
+  };
+
+  // retention policy (T128, NFR-010)
+  getRetentionPolicy = async (_req: Request, res: Response) => {
+    actorOf(res, ADMIN);
+    send(res, 200, await this.admin.getRetentionPolicy());
+  };
+  setRetentionPolicy = async (req: Request, res: Response) => {
+    const actor = actorOf(res, ADMIN);
+    send(res, 200, await this.admin.setRetentionPolicy(parseOrThrow(schemas.retentionPolicy, req.body), ifMatchOf(req), actor));
   };
   listEscalationRules = async (_req: Request, res: Response) => {
     actorOf(res, ['STATE_ADMIN', 'DISTRICT_QM']);

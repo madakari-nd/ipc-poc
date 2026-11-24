@@ -18,6 +18,7 @@ import { OutboxPublisher } from './services/outbox.publisher.js';
 import { ElevateAdminGateway, UnconfiguredElevateAdmin } from './services/elevate-admin.gateway.js';
 import { internalEscalationRoutes } from './routes/internal/escalation.routes.js';
 import { createEmailSender } from './services/notification.email.js';
+import { RetentionJob } from './jobs/retention.job.js';
 
 const logger = createLogger('workflow');
 
@@ -72,6 +73,9 @@ async function main() {
   // US3: plan service + one-way ELEVATE reconciliation (every 5 min and after each transition).
   const planRt = createPlanRuntime({ cfg, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
   planRt.reconcile.start();
+  // T128: daily retention purge (dry-run report in the POC; every decision ledgered).
+  const retentionJob = new RetentionJob({ service: ctx.retention, logger });
+  retentionJob.start();
   // US4: task execution; each state change triggers the same reconciliation (CLOSED → completed in ELEVATE).
   const tasks = new TaskService({ ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
   tasks.attachReconcile(planRt.reconcile);
@@ -127,6 +131,7 @@ async function main() {
       clearInterval(clockTimer);
       await consumers.stop();
       await planRt.reconcile.stop();
+      await retentionJob.stop();
       await publisher.stop();
       await Promise.allSettled([producer.disconnect(), admin.disconnect()]);
     },

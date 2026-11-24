@@ -10,6 +10,7 @@ import { UnconfiguredElevateAdmin, type ElevateAdminPort } from './services/elev
 import { EscalationService } from './services/escalation.service.js';
 import { NotificationService, type EmailSender } from './services/notification.service.js';
 import { HomeService } from './services/home.service.js';
+import { RetentionService } from './services/retention.service.js';
 
 export interface WorkflowContext {
   clock: ClockService;
@@ -21,6 +22,7 @@ export interface WorkflowContext {
   notifications: NotificationService;
   escalations: EscalationService;
   home: HomeService;
+  retention: RetentionService;
 }
 
 /** Composition root for domain services (server, scripts and tests share it). */
@@ -39,9 +41,10 @@ export function createContext(o: {
   const scope = new ScopeService(ledger);
   const elevate = o.elevate ?? new UnconfiguredElevateAdmin(['ELEVATE_* settings']);
   const catalogue = new CatalogueService({ ledger, outbox, elevate, programmeNow: () => clock.programmeNow(), prefix: o.codePrefix });
-  const admin = new AdminService({ ledger, scope, catalogue, elevate, profile: o.profile, demoMode: () => clock.allowed });
   const notifications = new NotificationService({ outbox, email: o.email, logger: undefined });
   const escalations = new EscalationService({ ledger, outbox, programmeNow: () => clock.programmeNow(), notifications });
   const home = new HomeService(() => clock.programmeNow());
-  return { clock, ledger, outbox, scope, catalogue, admin, notifications, escalations, home };
+  const retention = new RetentionService({ ledger, profile: o.profile });
+  const admin = new AdminService({ ledger, scope, catalogue, elevate, profile: o.profile, demoMode: () => clock.allowed, retention });
+  return { clock, ledger, outbox, scope, catalogue, admin, notifications, escalations, home, retention };
 }

@@ -323,6 +323,7 @@
       "cycles": "Cycles",
       "risk-defaults": "Risk defaults",
       "escalation-rules": "Escalation rules",
+      "retention": "Data retention",
       "demo-clock": "Demo clock"
     },
     "actions": "Actions",
@@ -456,6 +457,19 @@
       "minPhotos": "Minimum photos",
       "secondValidation": "Needs a second validation",
       "saved": "{{level}} defaults saved"
+    },
+    "retention": {
+      "title": "Data retention",
+      "help": "How long the programme keeps evidence, the audit ledger and other records.",
+      "emptyTitle": "No policy yet",
+      "emptyDescription": "The default policy has not been saved yet.",
+      "evidence": "Evidence (years after the plan closes)",
+      "audit": "Audit ledger (years)",
+      "other": "Other records (years after the programme ends)",
+      "enforce": "Actually delete at the end of the period (the POC keeps this off)",
+      "dryRunNote": "In dry-run mode the daily job only reports what it would delete and records each decision in the audit ledger.",
+      "changeReason": "Retention policy updated from the admin screen",
+      "saved": "Retention policy saved"
     },
     "rules": {
       "title": "Escalation rules",
