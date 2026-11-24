@@ -622,5 +622,425 @@
       "offline": "You are offline. Connect to the internet and try again.",
       "generic": "The plan could not be saved. Try again."
     }
+  },
+  "oversight": {
+    "title": "Oversight",
+    "intro": "Assessment completion, critical tasks, repeated failures, score trend and data-quality issues in your area.",
+    "asOf": "Programme date: {{date}}",
+    "switch": {
+      "label": "View",
+      "state": "Whole state (all districts)",
+      "district": "District {{code}}"
+    },
+    "kpi": {
+      "label": "Key numbers",
+      "titleState": "Whole state",
+      "titleDistrict": "District {{code}}",
+      "completion": "Assessment completion",
+      "completionNote": "{{assessed}} of {{wards}} wards assessed",
+      "openCritical": "Open critical tasks",
+      "overdueCritical": "Overdue critical tasks",
+      "repeatedFailures": "Repeated failures",
+      "dataQuality": "Data quality issues",
+      "averageScore": "Average latest score"
+    },
+    "trend": {
+      "title": "Score trend by cycle",
+      "cycle": "Cycle",
+      "average": "Average score",
+      "empty": "No completed assessments yet."
+    },
+    "status": {
+      "not_started": "Not started",
+      "submitted": "Submitted",
+      "completed": "Completed",
+      "held": "Held for release"
+    },
+    "wards": {
+      "title": "Wards",
+      "ward": "Ward",
+      "facility": "Hospital",
+      "district": "District",
+      "status": "Assessment",
+      "score": "Latest score",
+      "openCritical": "Open critical",
+      "overdueCritical": "Overdue critical",
+      "repeatedFailures": "Repeated failures",
+      "dataQuality": "Data quality issues",
+      "filterFacility": "Hospital",
+      "allFacilities": "All hospitals",
+      "filterStatus": "Assessment status",
+      "allStatuses": "All statuses",
+      "empty": {
+        "title": "No wards match",
+        "description": "Change the filters to see more wards."
+      }
+    },
+    "dq": {
+      "title": "Data quality issues",
+      "filterKind": "Issue type",
+      "allKinds": "All issue types",
+      "unknownPlace": "Place not known",
+      "uploader": "Uploaded by {{name}}",
+      "deviceUser": "Phone of {{name}}",
+      "empty": {
+        "title": "No data quality issues",
+        "description": "Nothing needs checking in your area right now."
+      },
+      "kind": {
+        "PHOTO_NO_GPS": "Photo without location",
+        "GPS_FAR_FROM_FACILITY": "Photo taken more than 1 km from the hospital",
+        "DEVICE_CLOCK_SKEW": "Phone clock wrong by more than 10 minutes",
+        "LATE_UPLOAD": "Photo uploaded more than 7 days after it was taken",
+        "DUPLICATE_PHOTO_ACROSS_WARDS": "Same photo used in two wards",
+        "NO_BASELINE": "No baseline assessment 3 weeks into the cycle",
+        "STALE_DEVICE_QUEUE": "Phone has unsent items older than 72 hours"
+      },
+      "metric": {
+        "distance": "{{value}} m away",
+        "skew": "{{value}} min off",
+        "delay": "{{value}} days late",
+        "pending_one": "{{count}} item waiting for {{value}} h",
+        "pending_other": "{{count}} items waiting for {{value}} h",
+        "days": "{{value}} days since the cycle started",
+        "related_one": "{{count}} other copy",
+        "related_other": "{{count}} other copies"
+      }
+    }
+  },
+  "comparison": {
+    "title": "Comparison with the baseline",
+    "intro": "Completed ward assessments, compared with the previous cycle.",
+    "back": "Back to assessments",
+    "baseline": "Baseline",
+    "repeat": "Repeat",
+    "totalChange": "Total change",
+    "likeForLike": "Only questions that are the same in both checklist versions are counted.",
+    "version": "Checklist version",
+    "versionN": "Version {{n}}",
+    "assessor": "Assessed by",
+    "assessorType": {
+      "internal": "Hospital IPC officer",
+      "external": "External auditor"
+    },
+    "completed": "Completed",
+    "sections": "Score by section",
+    "section": "Section",
+    "change": "Change",
+    "compared": "Questions compared",
+    "noBaseline": "There is no completed assessment of this ward in the previous cycle, so there is nothing to compare with yet.",
+    "open": "View comparison",
+    "openFor": "View comparison for {{ward}}",
+    "notComparable": {
+      "title": "Not comparable (version change)",
+      "none": "All questions could be compared.",
+      "missing_in_baseline": "new in this checklist version",
+      "missing_in_current": "no longer in this checklist version",
+      "text_changed": "question wording changed"
+    },
+    "releaseState": {
+      "na": "Visible",
+      "held": "Held for release",
+      "released": "Released"
+    },
+    "trend": {
+      "title": "Score trend across cycles",
+      "empty": "No completed assessments yet.",
+      "table": "Scores by cycle",
+      "cycle": "Cycle",
+      "total": "Total score"
+    },
+    "list": {
+      "title": "Completed assessments",
+      "ward": "Ward",
+      "visibility": "Hospital can see",
+      "actions": "Actions",
+      "emptyTitle": "No completed assessments yet",
+      "emptyDescription": "Completed ward assessments appear here."
+    },
+    "release": {
+      "title": "Results waiting for release",
+      "intro": "External auditor results stay hidden from the hospital until you release them.",
+      "completed": "Completed {{date}}",
+      "score": "Total score {{total}}",
+      "action": "Release to hospital",
+      "confirmTitle": "Release this result to the hospital?",
+      "confirmDescription": "The hospital team of {{ward}} will see this result and its comparison. This is recorded in the audit history.",
+      "confirm": "Release result",
+      "note": "Note (optional)",
+      "noteHint": "Do not include patient details.",
+      "done": "Result for {{ward}} released to the hospital.",
+      "emptyTitle": "No results waiting",
+      "emptyDescription": "New external auditor results will appear here."
+    },
+    "errors": {
+      "offline": "You are offline. Connect and try again.",
+      "conflict": "This result changed since you opened it. Reload the page and try again.",
+      "transition": "This result can no longer be released. Reload the page.",
+      "denied": "You cannot release this result.",
+      "generic": "The result could not be released. Try again."
+    }
+  },
+  "support": {
+    "intro": "Ask an expert mentor for help with a ward problem. Mentors are ranked by IPC skill, then language, then an open slot in the next 14 days.",
+    "introMentor": "Support requests sent to you. Accept them in ELEVATE mentoring; after the session, record the agreed actions here.",
+    "skills": {
+      "hand_hygiene": "Hand hygiene",
+      "ppe": "PPE",
+      "waste": "Biomedical waste",
+      "cleaning": "Cleaning",
+      "device_bundles": "Device bundles",
+      "sterilisation": "Sterilisation"
+    },
+    "languages": {
+      "en": "English",
+      "hi": "Hindi",
+      "kn": "Kannada"
+    },
+    "status": {
+      "open": "Choose a mentor",
+      "requested": "Waiting for the mentor",
+      "accepted": "Accepted",
+      "rejected": "Declined – choose another mentor",
+      "held": "Session held",
+      "closed": "Added to the plan"
+    },
+    "new": {
+      "title": "New support request",
+      "ward": "Ward",
+      "chooseWard": "Choose a ward",
+      "problem": "Problem",
+      "problemHint": "For example: hand hygiene compliance stuck at 40%",
+      "skill": "IPC skill needed",
+      "chooseSkill": "Choose a skill",
+      "language": "Preferred language",
+      "chooseLanguage": "Choose a language",
+      "submit": "Find mentors",
+      "done": "Request raised. Choose a mentor from the shortlist."
+    },
+    "shortlist": {
+      "title": "Mentor shortlist",
+      "order": "Ranked by skill match, then language, then an open slot in the next 14 days.",
+      "refresh": "Check availability again",
+      "rank": "{{rank}}. {{name}}",
+      "why": "Why this rank",
+      "choose": "Request a session",
+      "emptyTitle": "No mentors found",
+      "emptyDescription": "No mentor is registered yet. Ask the state administrator to add mentors."
+    },
+    "reasons": {
+      "skill": "Expert in {{skill}}",
+      "noSkill": "Not an expert in {{skill}}",
+      "language": "Speaks {{language}}",
+      "noLanguage": "Does not speak {{language}}",
+      "available": "Open slot on {{when}}",
+      "notAvailable": "No open slot in the next 14 days"
+    },
+    "session": {
+      "title": "Request a session with {{name}}",
+      "descriptionSlot": "The request goes to the mentor in ELEVATE mentoring for their next open slot, or the time you choose.",
+      "descriptionNoSlot": "This mentor has no open slot in the next 14 days. Propose a time.",
+      "start": "Session start (India time)",
+      "startOptional": "Session start (optional, India time)",
+      "startHint": "Leave empty to use the mentor's next open slot.",
+      "message": "Message to the mentor (optional)",
+      "confirm": "Send request",
+      "done": "Session requested. The mentor will accept it in ELEVATE."
+    },
+    "next": {
+      "requested": "Waiting for the mentor to accept in ELEVATE mentoring. This page checks again automatically.",
+      "accepted": "The mentor accepted. After the session the mentor records the agreed actions."
+    },
+    "plan": {
+      "title": "Add agreed actions to the ward plan",
+      "intro": "Each action becomes a task in the ward plan (a new plan revision). Choose an owner for each.",
+      "actions": "Agreed actions",
+      "submit": "Add to plan",
+      "done": "Added to the plan as revision {{n}}."
+    },
+    "outcome": {
+      "title": "Record the session outcome",
+      "heldOn": "Session held on",
+      "action": "Agreed action {{n}}",
+      "addAction": "Add another action",
+      "submit": "Mark held and save actions",
+      "done": "Outcome saved. The officer will add the actions to the plan.",
+      "agreed": "Agreed actions"
+    },
+    "mine": {
+      "title": "Requests sent to me",
+      "refresh": "Check ELEVATE again",
+      "acceptInElevate": "Accept this request in ELEVATE mentoring, then check again here.",
+      "emptyTitle": "No requests for you",
+      "emptyDescription": "When an officer asks you for a session it appears here."
+    },
+    "list": {
+      "title": "Support requests",
+      "open": "Open",
+      "emptyTitle": "No support requests yet",
+      "emptyDescription": "Raise a request above when a ward needs expert help."
+    },
+    "card": {
+      "label": "Support request for {{ward}}",
+      "need": "{{skill}} · {{language}}",
+      "mentor": "Mentor: {{name}}",
+      "revision": "plan revision {{n}}"
+    },
+    "errors": {
+      "offline": "You are offline. Your change was not sent; try again when you are connected.",
+      "conflict": "Someone changed this request since you opened it. Reload and try again.",
+      "elevate": "ELEVATE mentoring is not reachable right now. Try again in a few minutes.",
+      "validation": "Some details are not valid. Check them and try again.",
+      "transition": "This step is not possible in the request's current state. Reload to see where it is.",
+      "denied": "You cannot do this for this request.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "review": {
+    "title": "Task review",
+    "owner": "Owner",
+    "due": "Due",
+    "overdue": "overdue",
+    "returns": "Times returned",
+    "blocked": "Blocked: {{reason}}",
+    "blockedShort": "Blocked",
+    "lastReturn": "Last returned: {{reason}}",
+    "confirm": "Confirm",
+    "reason": "Reason",
+    "reasonPlaceholder": "Choose a reason",
+    "reasonRequired": "Choose a reason from the list.",
+    "reasonTextRequired": "Write a short reason.",
+    "note": "Note (optional)",
+    "noteHint": "Do not write patient names or numbers.",
+    "reasons": {
+      "MEETS_STANDARD": "Meets the standard",
+      "MEETS_STANDARD_WITH_NOTE": "Meets the standard, with a note",
+      "EVIDENCE_UNCLEAR": "Proof is not clear",
+      "EVIDENCE_INCOMPLETE": "Proof is incomplete",
+      "WRONG_LOCATION_OR_ITEM": "Wrong place or item",
+      "STANDARD_NOT_MET": "Standard not met",
+      "PATIENT_DATA_VISIBLE": "A patient can be identified",
+      "OTHER": "Other"
+    },
+    "accept": {
+      "open": "Accept",
+      "title": "Accept this proof?",
+      "confirm": "Accept",
+      "done": "Accepted."
+    },
+    "return": {
+      "open": "Return",
+      "title": "Return this task with a reason?",
+      "confirm": "Return to owner",
+      "done": "Returned to the owner."
+    },
+    "validate": {
+      "open": "Validate",
+      "title": "Validate and close this task?",
+      "confirm": "Validate and close",
+      "done": "Validated. The task is closed."
+    },
+    "reassign": {
+      "open": "Reassign",
+      "title": "Reassign this task",
+      "description": "The state stays the same. The history keeps the previous owner.",
+      "owner": "New owner",
+      "choose": "Choose a person",
+      "ownerRequired": "Choose the new owner.",
+      "reason": "Reason",
+      "confirm": "Reassign",
+      "done": "Task reassigned."
+    },
+    "block": {
+      "open": "Flag as blocked",
+      "clear": "Clear blocked flag",
+      "title": "Flag this task as blocked",
+      "description": "The state does not change. Say what is blocking it.",
+      "clearTitle": "Clear the blocked flag",
+      "clearDescription": "The task is no longer blocked.",
+      "reason": "Reason",
+      "confirm": "Flag as blocked",
+      "done": "Blocked flag updated."
+    },
+    "evidence": {
+      "title": "Proof",
+      "none": "No proof submitted yet.",
+      "item": "Proof {{n}}",
+      "captured": "Taken",
+      "location": "Location",
+      "gps": "{{lat}}, {{lng}} (±{{accuracy}} m)",
+      "gpsUnavailable": "GPS unavailable",
+      "fingerprint": "Fingerprint (SHA-256)",
+      "open": "View file",
+      "openPdf": "Open the PDF (link valid 5 minutes)",
+      "alt": "Proof photo {{n}}",
+      "unavailable": "This file's details could not be loaded.",
+      "delete": "Delete: shows a patient",
+      "deleteTitle": "Delete this file permanently?",
+      "deleteDescription": "Use this only when a patient can be identified. The file is removed for good; its details and the audit record stay.",
+      "deleteConfirm": "Delete permanently",
+      "deleted": "Deleted because a patient could be identified.",
+      "deletedToast": "File deleted. Return the task so the owner can retake the photo."
+    },
+    "history": {
+      "title": "History",
+      "owner": "owner {{from}} → {{to}}",
+      "actions": {
+        "task_assigned": "Assigned",
+        "task_started": "Started",
+        "task_evidence_submitted": "Proof sent",
+        "task_accepted": "Accepted (verified)",
+        "task_closed": "Closed",
+        "task_pending_validation": "Sent for validation",
+        "task_returned": "Returned",
+        "task_validated": "Validated",
+        "task_validation_returned": "Returned by validator",
+        "task_reassigned": "Reassigned",
+        "task_blocked": "Flagged as blocked",
+        "task_unblocked": "Blocked flag cleared",
+        "task_reopened": "Reopened",
+        "task_escalated": "Escalated",
+        "reconcile_corrected": "ELEVATE corrected",
+        "owner_denied": "Refused: not the owner",
+        "scope_denied": "Refused: outside area"
+      }
+    },
+    "queues": {
+      "line_one": "Due {{due}} · owner {{owner}} · returned {{count}} time",
+      "line_other": "Due {{due}} · owner {{owner}} · returned {{count}} times",
+      "reviews": {
+        "title": "Review queue",
+        "description": "Proof sent by staff in your wards. Accept it or return it with a reason.",
+        "emptyTitle": "Nothing to review",
+        "emptyDescription": "New proof appears here.",
+        "open": "Review",
+        "back": "Back to the review queue"
+      },
+      "validations": {
+        "title": "Validation queue",
+        "description": "Critical and high-risk tasks accepted by a ward supervisor and waiting for your second check.",
+        "emptyTitle": "Nothing to validate",
+        "emptyDescription": "Tasks waiting for second validation appear here.",
+        "open": "Validate",
+        "back": "Back to the validation queue"
+      },
+      "tasks": {
+        "title": "Ward tasks",
+        "description": "All tasks in your wards. Reassign owners or flag a blocked task.",
+        "emptyTitle": "No tasks",
+        "emptyDescription": "Tasks from approved plans appear here.",
+        "open": "Open",
+        "back": "Back to ward tasks"
+      }
+    },
+    "errors": {
+      "offline": "You are offline. Nothing was changed; try again when connected.",
+      "conflict": "Someone changed this task while you were looking. The latest version is now shown; check it and try again.",
+      "transition": "This task has already moved on. The latest version is shown.",
+      "validation": "Something is missing. Check the form and try again.",
+      "storage": "Files are unavailable right now. Try again shortly.",
+      "denied": "You cannot do this for this task.",
+      "generic": "That did not work. Try again."
+    }
   }
 }

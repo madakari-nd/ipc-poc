@@ -2737,6 +2737,9 @@ paths:
         evidence-based kinds: `PHOTO_NO_GPS`, `GPS_FAR_FROM_FACILITY` (> 1 km from the facility point),
         `DEVICE_CLOCK_SKEW` (> 10 min), `LATE_UPLOAD` (capture to upload > 7 days) and
         `DUPLICATE_PHOTO_ACROSS_WARDS` (same SHA-256 in two wards).
+        Also returns `deviceQueues`: every reported device outbox (DeviceQueueStatus, owned by the Edge)
+        that still holds unsent items (`pendingCount > 0`). Workflow applies the 72 h rule on programme
+        time and turns the old ones into `STALE_DEVICE_QUEUE` exceptions.
       security:
         - serviceJwt: []
       x-roles: [SERVICE]
@@ -2766,6 +2769,10 @@ paths:
                       items:
                         type: array
                         items: {$ref: '#/components/schemas/DataQualityException'}
+                      deviceQueues:
+                        type: array
+                        description: Device outboxes with unsent items (pendingCount > 0), for the stale-device rule.
+                        items: {$ref: '#/components/schemas/DeviceQueueStatus'}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -4625,6 +4632,9 @@ components:
         userId: {$ref: '#/components/schemas/UserId'}
         deviceId: {type: string, format: uuid}
         cycleId: {$ref: '#/components/schemas/ObjectId'}
+        facilityName: {type: string, maxLength: 200, description: Display name from the workflow register (set by workflow).}
+        wardName: {type: string, maxLength: 200, description: Display name from the workflow register (set by workflow).}
+        userName: {type: string, maxLength: 200, description: Uploader or device user display name when known (set by workflow).}
         metric:
           type: object
           description: Kind-specific value, e.g. distanceM, skewSec, uploadDelayHours, oldestPendingHours.

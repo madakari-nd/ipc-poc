@@ -6,8 +6,13 @@ import { createApp } from './app.js';
 import { loadWorkflowConfig, type WorkflowConfig } from './config/index.js';
 import { createContext } from './context.js';
 import { AssessmentService } from './services/assessment.service.js';
+import { ComparisonService } from './services/comparison.service.js';
+import { ReleaseService } from './services/release.service.js';
 import { createConsumers } from './consumers/registry.js';
 import { createPlanRuntime } from './services/plan.runtime.js';
+import { SupportService } from './services/support.service.js';
+import { HttpEdgeDq, OversightService } from './services/oversight.service.js';
+import { TaskService } from './services/task.service.js';
 import { startConsumers } from './consumers/runner.js';
 import { OutboxPublisher } from './services/outbox.publisher.js';
 import { ElevateAdminGateway, UnconfiguredElevateAdmin } from './services/elevate-admin.gateway.js';
@@ -64,12 +69,16 @@ async function main() {
   // US3: plan service + one-way ELEVATE reconciliation (every 5 min and after each transition).
   const planRt = createPlanRuntime({ cfg, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
   planRt.reconcile.start();
+  // US4: task execution; each state change triggers the same reconciliation (CLOSED → completed in ELEVATE).
+  const tasks = new TaskService({ ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow(), logger });
+  tasks.attachReconcile(planRt.reconcile);
 
   const consumers = await startConsumers(kafka, createConsumers({ logger, orgId: cfg.ELEVATE_ORG_ID, ledger: ctx.ledger, plans: planRt.plans }), {
     groupId: cfg.IPC_CONSUMER_GROUP,
     logger,
   });
 
+  const assessment = new AssessmentService({ ledger: ctx.ledger });
   const { app, health } = createApp({
     logger,
     jwt: { secret: cfg.SERVICE_JWT_SECRET, issuers: cfg.SERVICE_JWT_ISSUERS, audience: cfg.SERVICE_JWT_AUDIENCE },
@@ -81,8 +90,15 @@ async function main() {
     ledger: ctx.ledger,
     scope: ctx.scope,
     admin: { admin: ctx.admin, catalogue: ctx.catalogue, clock: ctx.clock },
-    assessment: new AssessmentService({ ledger: ctx.ledger }),
+    assessment,
     plans: planRt.plans,
+    support: new SupportService({ ledger: ctx.ledger, plans: planRt.plans, programmeNow: () => ctx.clock.programmeNow(), logger }),
+    oversight: new OversightService({ edge: new HttpEdgeDq(cfg.EDGE_INTERNAL_URL, cfg.SERVICE_JWT_SECRET), programmeNow: () => ctx.clock.programmeNow() }),
+    tasks,
+    comparison: {
+      comparison: new ComparisonService({ assessment }),
+      release: new ReleaseService({ assessment, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow() }),
+    },
   });
 
   const server = app.listen(cfg.PORT, cfg.HOST, () => {

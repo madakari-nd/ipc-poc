@@ -112,6 +112,17 @@ export interface CompletionInput {
   firstInCycle: boolean;
 }
 
+/**
+ * A revision made on behalf of another workflow (US6: mentor-agreed actions, FR-023): tasks carry
+ * `supportRequestId`, the revision and its event carry the source, and `inTx` runs inside the
+ * revision's transaction with the created task ids (in the order of the add changes).
+ */
+export interface RevisionLink {
+  source: 'mentor_outcome';
+  supportRequestId: string;
+  inTx?: (s: ClientSession, r: { revision: number; taskIds: string[] }) => Promise<void>;
+}
+
 /** Reconciliation trigger after each transition (FR-019); the job itself runs out of band. */
 export interface ReconcileTrigger { trigger(planId: string): void }
 
@@ -431,7 +442,7 @@ export class PlanService {
   }
 
   /** A revision of an active plan (FR-017): add, remove or change tasks with a reason. Closed tasks never change (FR-015). */
-  async revise(id: string, body: { reason: string; changes: PlanChangeInput[] }, ifMatch: number | undefined, actor: PlanActor) {
+  async revise(id: string, body: { reason: string; changes: PlanChangeInput[] }, ifMatch: number | undefined, actor: PlanActor, link?: RevisionLink) {
     const { plan, ward } = await this.visiblePlan(id, actor);
     if (plan.status !== 'active') throw Problem.conflict('INVALID_TRANSITION', 'Only an active plan can be revised');
     this.assertVersion(plan, ifMatch, await this.detail(plan, ward));
@@ -470,7 +481,7 @@ export class PlanService {
           ...(c.task.sourceQuestionKey ? { sourceQuestionKey: c.task.sourceQuestionKey } : {}), riskLevel: c.task.riskLevel, ownerUserId: c.task.ownerUserId,
           dueAt: c.task.dueAt ? new Date(c.task.dueAt) : new Date(now.getTime() + d.dueDays * DAY_MS), dependsOnTaskIds: deps(c.task.dependsOnTaskIds, i),
           evidenceRule: d.evidenceRule, secondValidation: d.secondValidation, state: 'ASSIGNED', rejectionCount: 0, blocked: null,
-          currentEvidenceIds: [], syncState: 'pending', v: 0,
+          currentEvidenceIds: [], syncState: 'pending', v: 0, ...(link ? { supportRequestId: oid(link.supportRequestId) } : {}),
         };
         owners.push(c.task.ownerUserId);
         adds.push(doc);
@@ -523,16 +534,20 @@ export class PlanService {
           beforeHash: contentHash(toTaskDto(u.t, String(plan.wardId), now)), afterHash: contentHash(toTaskDto(after as Task, String(plan.wardId), now)),
         }, s);
       }
-      await PlanRevisionModel.create([{ planId: plan._id, revision, actorUserId: actor.userId, role: actor.role, reason: body.reason, source: 'officer', changes: recorded.map((c) => ({ ...c, taskId: oid(c.taskId) })), v: 0 }], { session: s });
+      await PlanRevisionModel.create([{ planId: plan._id, revision, actorUserId: actor.userId, role: actor.role, reason: body.reason, source: link?.source ?? 'officer', changes: recorded.map((c) => ({ ...c, taskId: oid(c.taskId) })), v: 0 }], { session: s });
       await this.d.ledger.append({
         actor: who, action: 'plan.revised', subject: { type: 'plan', id: String(plan._id) }, reason: `r${revision}: ${body.reason}`.slice(0, 500),
         beforeHash: contentHash(toPlanDto(plan, facilityId)), afterHash: contentHash(toPlanDto(next as Plan, facilityId)),
       }, s);
       await this.d.outbox.enqueue({
         type: 'ipc.plan.revised', key: String(plan.wardId), actor: who, subject: { type: 'plan', id: String(plan._id) },
-        payload: { planId: String(plan._id), wardId: String(plan.wardId), facilityId, revision, source: 'officer', changes: recorded.map((c) => ({ op: c.op, taskId: c.taskId })) },
+        payload: {
+          planId: String(plan._id), wardId: String(plan.wardId), facilityId, revision, source: link?.source ?? 'officer',
+          ...(link ? { supportRequestId: link.supportRequestId } : {}), changes: recorded.map((c) => ({ op: c.op, taskId: c.taskId })),
+        },
       }, s);
       for (const t of created) await this.taskAssigned(t.toObject() as Task, plan, facilityId, who, 'initial', s);
+      await link?.inTx?.(s, { revision, taskIds: created.map((t) => String(t._id)) });
     });
     this.reconcile?.trigger(id);
     return this.get(id, actor);

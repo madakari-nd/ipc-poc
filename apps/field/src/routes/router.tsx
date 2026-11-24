@@ -9,6 +9,7 @@ import { LoginRoute } from './LoginRoute.js';
 import { NotFoundRoute } from './NotFoundRoute.js';
 import { QueueRoute } from './QueueRoute.js';
 import { SectionRoute } from './SectionRoute.js';
+import { TaskRoute, TasksRoute } from './TasksRoute.js';
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
@@ -27,6 +28,8 @@ export const router = createBrowserRouter(
             { path: 'home', element: <Navigate to="/" replace /> },
             { path: 'assessments', element: <AssessmentsRoute /> },
             { path: 'assessments/:assessmentId', element: <AssessmentFormRoute /> },
+            { path: 'tasks', element: <TasksRoute /> },
+            { path: 'tasks/:taskId', element: <TaskRoute /> },
             { path: ':section', element: <SectionRoute /> },
             { path: '*', element: <NotFoundRoute /> },
           ],

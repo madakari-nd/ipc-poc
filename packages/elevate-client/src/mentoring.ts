@@ -44,6 +44,22 @@ export class MentoringClient {
     return r.result.is_available;
   }
 
+  /**
+   * g4: the mentor publishes an availability window (mentor token). `isAvailable` answers true only
+   * for a slot inside one window; a daily recurring window gives open slots every day (US6).
+   */
+  async createAvailability(mentorToken: string, input: { eventName: string; startTime: number; endTime: number; repeatUnit?: 'DAY' | 'WEEK' }): Promise<{ id: string }> {
+    const r = await this.http.call({
+      operation: 'availability.create', method: 'POST', path: '/mentoring/v1/availability/create',
+      json: {
+        event_name: input.eventName, start_time: input.startTime, end_time: input.endTime,
+        ...(input.repeatUnit ? { repeat_unit: input.repeatUnit, repeat_increment: 1 } : {}),
+      },
+      auth: { userToken: mentorToken }, schema: Envelope(z.object({ id: z.union([z.string(), z.number()]).transform(String) }).passthrough()),
+    });
+    return { id: r.result.id };
+  }
+
   /** g3: BROKEN on this stack (500); kept so preflight can record whether it recovered. */
   async listMentors(userToken: string, filters: Record<string, string> = {}): Promise<unknown> {
     const r = await this.http.call({

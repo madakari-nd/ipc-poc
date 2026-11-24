@@ -83,6 +83,7 @@ async function main() {
     elevateUser: new ProxiedElevateUserApi(proxy),
     history: new HttpHistoryForwarder(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET),
     assessments: { workflow: new HttpAssessmentWorkflow(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET), elevate: new ProxiedAssessmentElevate(proxy) },
+    support: { workflow: new HttpForwarder(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET, { audience: 'ipc-workflow', service: 'workflow' }), mentoring: proxy },
     admin: {
       workflow: new HttpForwarder(cfg.WORKFLOW_URL, cfg.SERVICE_JWT_SECRET, { audience: 'ipc-workflow', service: 'workflow' }),
       adapters: new HttpForwarder(cfg.ADAPTERS_URL, cfg.SERVICE_JWT_SECRET, { audience: 'ipc-adapters', service: 'adapters' }),

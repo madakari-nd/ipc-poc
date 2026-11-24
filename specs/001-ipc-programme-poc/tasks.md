@@ -275,22 +275,22 @@ its own once Phase 2 is done.
 
 **Independent Test**: one return and one accept, then validation closes the task with the full history.
 
-- [ ] T090 [P] [US4] Write unit tests `services/workflow/tests/domain/task-state.test.ts`:
+- [X] T090 [P] [US4] Write unit tests `services/workflow/tests/domain/task-state.test.ts`:
   - every transition in the data-model table, and that wrong roles are refused with `INVALID_TRANSITION`
   - an open dependency gives `DEPENDENCY_OPEN`
   - rejection counting, and that reassign and block leave the state unchanged
   - reopen creates a linked task
-- [ ] T091 [P] [US4] Write `tests/integration/task.int.test.ts`. A closed task is synced as complete to project-service, and a stale If-Match gets 409
-- [ ] T092 [US4] Write `services/workflow/src/domain/task.ts`: a pure state machine, and `services/task.service.ts`. Every transition and its Decision, ledger record and outbox event go in one transaction (`ipc.task.evidence_submitted`, `ipc.task.decided`, `ipc.task.validated`)
-- [ ] T093 [US4] Write `services/edge/src/routes/tasks.routes.ts`:
+- [X] T091 [P] [US4] Write `tests/integration/task.int.test.ts`. A closed task is synced as complete to project-service, and a stale If-Match gets 409
+- [X] T092 [US4] Write `services/workflow/src/domain/task.ts`: a pure state machine, and `services/task.service.ts`. Every transition and its Decision, ledger record and outbox event go in one transaction (`ipc.task.evidence_submitted`, `ipc.task.decided`, `ipc.task.validated`)
+- [X] T093 [US4] Write `services/edge/src/routes/tasks.routes.ts`:
   - mine, the ward queue, start, submit evidence, accept, return, validate, validation-return, reassign, block, reopen and history
   - the evidence rule is checked when evidence is submitted
-- [ ] T094 [P] [US4] Build `apps/field/src/features/tasks/`: MyTasks offline, TaskDetail, Start, upload proof through the outbox, a "returned: reason" banner, and DiffReview on 409
-- [ ] T095 [P] [US4] Build `apps/officer/src/features/review/`:
+- [X] T094 [P] [US4] Build `apps/field/src/features/tasks/`: MyTasks offline, TaskDetail, Start, upload proof through the outbox, a "returned: reason" banner, and DiffReview on 409
+- [X] T095 [P] [US4] Build `apps/officer/src/features/review/`:
   - the supervisor's ReviewQueue, an evidence viewer with signed URLs, Accept, Return (ConfirmWithReason with a reason list) and patient-data deletion
   - the ValidationQueue for the IPC officer or DQM
   - Reassign and Block
-- [ ] T096 [US4] Write the E2E test `tests/e2e/us4-execution.spec.ts`. It covers the full loop including two devices conflicting (409, then the differences view) and a blocked dependency. It includes an axe check
+- [X] T096 [US4] Write the E2E test `tests/e2e/us4-execution.spec.ts`. It covers the full loop including two devices conflicting (409, then the differences view) and a blocked dependency. It includes an axe check
 
 ---
 
@@ -321,12 +321,12 @@ its own once Phase 2 is done.
 
 **Independent Test**: the hand hygiene + Hindi mentor ranks first, and the outcome adds 2 tasks in revision r2.
 
-- [ ] T104 [P] [US6] Write unit tests `services/workflow/tests/domain/mentor-rank.test.ts`. The ranking orders by skill, then language, then availability (an open slot within 14 programme days), and ties are stable
-- [ ] T105 [P] [US6] Write `tests/integration/support.int.test.ts` covering requestSessions create (officer token), accept (mentor), list, and isAvailable (E10, E11)
-- [ ] T106 [US6] Write `services/workflow/src/services/support.service.ts`. It covers MentorProfileCache refresh, the shortlist, recording the session reference, the outcome as a PlanRevision with new tasks (FR-023), and mentor scope derived from accepted requests
-- [ ] T107 [US6] Write `services/edge/src/routes/support.routes.ts` covering create, shortlist, request-session (proxied to ELEVATE with the officer token) and outcome (mentor only). The edge applies the mentor's scope
-- [ ] T108 [P] [US6] Build `apps/officer/src/features/support/` with these screens: NewRequest, Shortlist (with reasons), RequestSession, and for the mentor MyRequests and OutcomeForm
-- [ ] T109 [US6] Write the E2E test `tests/e2e/us6-support.spec.ts`. The mentor accepts in ELEVATE and records the outcome, and 2 tasks appear on the plan. It includes an axe check
+- [X] T104 [P] [US6] Write unit tests `services/workflow/tests/domain/mentor-rank.test.ts`. The ranking orders by skill, then language, then availability (an open slot within 14 programme days), and ties are stable
+- [X] T105 [P] [US6] Write `tests/integration/support.int.test.ts` covering requestSessions create (officer token), accept (mentor), list, and isAvailable (E10, E11)
+- [X] T106 [US6] Write `services/workflow/src/services/support.service.ts`. It covers MentorProfileCache refresh, the shortlist, recording the session reference, the outcome as a PlanRevision with new tasks (FR-023), and mentor scope derived from accepted requests
+- [X] T107 [US6] Write `services/edge/src/routes/support.routes.ts` covering create, shortlist, request-session (proxied to ELEVATE with the officer token) and outcome (mentor only). The edge applies the mentor's scope
+- [X] T108 [P] [US6] Build `apps/officer/src/features/support/` with these screens: NewRequest, Shortlist (with reasons), RequestSession, and for the mentor MyRequests and OutcomeForm
+- [X] T109 [US6] Write the E2E test `tests/e2e/us6-support.spec.ts`. The mentor accepts in ELEVATE and records the outcome, and 2 tasks appear on the plan. It includes an axe check
 
 ---
 
@@ -336,17 +336,17 @@ its own once Phase 2 is done.
 
 **Independent Test**: the seeded baseline compares by section with the repeat; results are hidden before release.
 
-- [ ] T110 [P] [US7] Write unit tests `services/workflow/tests/domain/comparison.test.ts`:
+- [X] T110 [P] [US7] Write unit tests `services/workflow/tests/domain/comparison.test.ts`:
   - same version compares by section
   - across v1 and v2, only questions with the same key and the same text hash are compared, and the rest go under "Not comparable (version change)"
   - the baseline is the latest completed assessment of the previous cycle
-- [ ] T111 [US7] Write `services/workflow/src/services/comparison.service.ts` with a trend across cycles, and `release.service.ts` where only the DQM can release, the release is recorded in the ledger and `ipc.assessment.released` is emitted
-- [ ] T112 [US7] Write `services/edge/src/routes/comparisons.routes.ts` and `release.routes.ts`. Results held for release are hidden from hospital roles, and the auditor has read-only access to plans and evidence
-- [ ] T113 [P] [US7] Build `apps/officer/src/features/comparison/` with these parts:
+- [X] T111 [US7] Write `services/workflow/src/services/comparison.service.ts` with a trend across cycles, and `release.service.ts` where only the DQM can release, the release is recorded in the ledger and `ipc.assessment.released` is emitted
+- [X] T112 [US7] Write `services/edge/src/routes/comparisons.routes.ts` and `release.routes.ts`. Results held for release are hidden from hospital roles, and the auditor has read-only access to plans and evidence
+- [X] T113 [P] [US7] Build `apps/officer/src/features/comparison/` with these parts:
   - a ComparisonView with per-section deltas and the not-comparable list
   - a TrendChart using Recharts
   - the DQM ReleaseQueue
-- [ ] T114 [US7] Write the E2E test `tests/e2e/us7-repeat.spec.ts`: clock +30 days, the external auditor submits, the result is hidden from Hospital A, the DQM releases it, and the comparison is checked. It includes an axe check
+- [X] T114 [US7] Write the E2E test `tests/e2e/us7-repeat.spec.ts`: clock +30 days, the external auditor submits, the result is hidden from Hospital A, the DQM releases it, and the comparison is checked. It includes an axe check
 
 ---
 
@@ -356,11 +356,11 @@ its own once Phase 2 is done.
 
 **Independent Test**: District 1's numbers match the seeded records, and DQM 2 sees no District 1 data.
 
-- [ ] T115 [P] [US8] Write unit tests `services/workflow/tests/domain/oversight.test.ts` covering completion, overdue critical, repeated failures (2 or more rejections, or failed in 2 consecutive cycles), trend, and the 7 data-quality rules from FR-026 including GPS more than 1 km away and duplicate hashes
-- [ ] T116 [US8] Write `services/workflow/src/services/oversight.service.ts`. It builds read models from programme data and ELEVATE references, filtered by scope, and gets the evidence-based exceptions from the edge's `edgeInternalEvidenceDQ`
-- [ ] T117 [US8] Write `services/edge/src/routes/oversight.routes.ts` with summary, wards, data-quality and trend, all scoped
-- [ ] T118 [P] [US8] Build `apps/officer/src/features/oversight/`: KPI tiles, the wards DataTable with filters, the trend, the DataQualityList, and a district or state switch limited to the user's scope
-- [ ] T119 [US8] Write the E2E test `tests/e2e/us8-oversight.spec.ts`. The numbers must equal the seeded expectations (SC-006), and the district isolation is checked. It includes an axe check
+- [X] T115 [P] [US8] Write unit tests `services/workflow/tests/domain/oversight.test.ts` covering completion, overdue critical, repeated failures (2 or more rejections, or failed in 2 consecutive cycles), trend, and the 7 data-quality rules from FR-026 including GPS more than 1 km away and duplicate hashes
+- [X] T116 [US8] Write `services/workflow/src/services/oversight.service.ts`. It builds read models from programme data and ELEVATE references, filtered by scope, and gets the evidence-based exceptions from the edge's `edgeInternalEvidenceDQ`
+- [X] T117 [US8] Write `services/edge/src/routes/oversight.routes.ts` with summary, wards, data-quality and trend, all scoped
+- [X] T118 [P] [US8] Build `apps/officer/src/features/oversight/`: KPI tiles, the wards DataTable with filters, the trend, the DataQualityList, and a district or state switch limited to the user's scope
+- [X] T119 [US8] Write the E2E test `tests/e2e/us8-oversight.spec.ts`. The numbers must equal the seeded expectations (SC-006), and the district isolation is checked. It includes an axe check
 
 ---
 

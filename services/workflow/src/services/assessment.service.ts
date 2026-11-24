@@ -126,14 +126,14 @@ export class AssessmentService {
     return !other;
   }
 
-  /** Latest completed assessment of the ward in the previous cycle. */
-  private async defaultBaselineOf(wardId: Types.ObjectId, cycle: Cycle, s: ClientSession): Promise<Types.ObjectId | undefined> {
-    const cycles = await CycleModel.find({}, { startsAt: 1 }).session(s).lean<Cycle[]>();
+  /** Latest completed assessment of the ward in the previous cycle (also the US7 comparison baseline). */
+  async defaultBaselineOf(wardId: Types.ObjectId, cycle: Pick<Cycle, '_id' | 'startsAt'>, s?: ClientSession): Promise<Types.ObjectId | undefined> {
+    const cycles = await CycleModel.find({}, { startsAt: 1 }).session(s ?? null).lean<Cycle[]>();
     const prev = previousCycle(cycles, cycles.find((c) => String(c._id) === String(cycle._id)) ?? cycle);
     if (!prev) return undefined;
     const last = await AssessmentContextModel.findOne({ wardId, cycleId: prev._id, status: 'completed' }, { _id: 1 })
       .sort({ completedAt: -1 })
-      .session(s)
+      .session(s ?? null)
       .lean<{ _id: Types.ObjectId }>();
     return last?._id;
   }
@@ -259,7 +259,7 @@ export class AssessmentService {
   }
 
   /** Visibility: inside the actor's scope; held external results only for their assessor and above-hospital roles. */
-  private async visibleFilter(actor: { userId: string } & ActorScope): Promise<Record<string, unknown>> {
+  async visibleFilter(actor: { userId: string } & ActorScope): Promise<Record<string, unknown>> {
     const vis = await visibleFacilityIds(actor);
     const filter: Record<string, unknown> = {};
     if (!('all' in vis)) {
@@ -270,7 +270,7 @@ export class AssessmentService {
     return filter;
   }
 
-  private async findVisible(id: string, actor: { userId: string } & ActorScope): Promise<AssessmentContext> {
+  async findVisible(id: string, actor: { userId: string } & ActorScope): Promise<AssessmentContext> {
     if (!isOid(id)) throw Problem.notFound();
     const doc = await AssessmentContextModel.findOne({ _id: oid(id), ...(await this.visibleFilter(actor)) }).lean<AssessmentContext>();
     // The assessor always sees their own assessment (an external auditor's facility list may change).

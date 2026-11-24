@@ -152,7 +152,9 @@ export class AdminController {
 
   // hierarchy and people
   listFacilities = async (req: Request, res: Response) => {
-    const actor = actorOf(res, ['STATE_ADMIN', 'DISTRICT_QM', 'IPC_OFFICER', 'WARD_SUPERVISOR', 'MENTOR', 'EXTERNAL_AUDITOR']);
+    // FRONTLINE: only the Edge's ward register (evidence intents for own tasks, US4) reaches this
+    // mirrored route for that role; the public listFacilities still refuses it by x-roles.
+    const actor = actorOf(res, ['STATE_ADMIN', 'DISTRICT_QM', 'IPC_OFFICER', 'WARD_SUPERVISOR', 'MENTOR', 'EXTERNAL_AUDITOR', 'FRONTLINE']);
     res.json(await this.admin.listFacilities(await this.actorScope(actor), parseOrThrow(queries.facilities, req.query)));
   };
   listUsers = async (req: Request, res: Response) => {

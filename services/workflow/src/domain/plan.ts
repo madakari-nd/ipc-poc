@@ -66,6 +66,8 @@ export interface SubmissionScore {
   total: number;
   bySection: Record<string, number>;
   failedQuestionKeys: string[];
+  /** Score per programme question key (US7 cross-version comparison). */
+  byQuestion: Record<string, number>;
   /** `event` = ELEVATE's own scores; `catalogue` = computed from answers with catalogue pass marks. */
   source: 'event' | 'catalogue';
 }
@@ -125,6 +127,7 @@ export function scoreSubmission(
   let total = 0;
   const bySection: Record<string, number> = {};
   const failed: string[] = [];
+  const byQuestion: Record<string, number> = {};
   for (const q of questions) {
     const a = q.elevateQuestionExternalId ? byRoot.get(rootExternalId(q.elevateQuestionExternalId)) : undefined;
     if (!a) continue;
@@ -132,10 +135,11 @@ export function scoreSubmission(
     if (fromEvent !== undefined) usedEvent = true;
     const score = round2((fromEvent ?? catalogueFraction(q, a)) * q.maxScore);
     bySection[q.sectionKey] = round2((bySection[q.sectionKey] ?? 0) + score);
+    byQuestion[q.questionKey] = score;
     total += score;
     if (score < q.passMark) failed.push(q.questionKey);
   }
-  return { total: round2(total), bySection, failedQuestionKeys: failed, source: usedEvent ? 'event' : 'catalogue' };
+  return { total: round2(total), bySection, failedQuestionKeys: failed, byQuestion, source: usedEvent ? 'event' : 'catalogue' };
 }
 
 // ----------------------------------------------------------------------------------- drafting (FR-011)

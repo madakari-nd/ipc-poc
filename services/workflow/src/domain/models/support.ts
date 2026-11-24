@@ -8,10 +8,11 @@ export const SKILLS = ['hand_hygiene', 'ppe', 'waste', 'cleaning', 'device_bundl
 
 // ---- MentorProfileCache (§6)
 export interface MentorProfileCache extends Meta {
-  elevateMentorId: string; skills: string[]; languages: string[]; nextOpenSlotAt?: Date; refreshedAt: Date;
+  elevateMentorId: string; name?: string; skills: string[]; languages: string[]; nextOpenSlotAt?: Date; refreshedAt: Date;
 }
 export const MentorProfileCacheModel = modelFor<MentorProfileCache>('MentorProfileCache', defineSchema('mentor_profile_cache', {
   elevateMentorId: elevateId(true),
+  name: text({ max: 200 }),
   skills: [text({ enum: SKILLS })],
   languages: [text({ enum: LANGUAGES })],
   nextOpenSlotAt: Date,

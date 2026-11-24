@@ -25,11 +25,11 @@ const item = (section: Section): NavItem => ({ section, path: section === 'home'
 /** FR-036: officer web roles. Each sees only the areas it may act in; FRONTLINE uses the field app. */
 export const OFFICER_NAV: Partial<Record<Role, NavItem[]>> = {
   STATE_ADMIN: [item('home'), item('oversight'), item('admin'), item('checklists'), item('ledger')],
-  DISTRICT_QM: [item('home'), item('oversight'), item('validations'), item('escalations')],
+  DISTRICT_QM: [item('home'), item('assessments'), item('oversight'), item('validations'), item('escalations')],
   IPC_OFFICER: [item('home'), item('assessments'), item('plans'), item('validations'), item('support'), item('escalations')],
   WARD_SUPERVISOR: [item('home'), item('reviews'), item('tasks'), item('support')],
   MENTOR: [item('home'), item('support')],
-  EXTERNAL_AUDITOR: [item('home'), item('plans'), item('ledger')],
+  EXTERNAL_AUDITOR: [item('home'), item('assessments'), item('plans'), item('ledger')],
 };
 
 export const SECTIONS: Section[] = ['assessments', 'plans', 'tasks', 'reviews', 'validations', 'escalations', 'support', 'oversight', 'checklists', 'admin', 'ledger'];

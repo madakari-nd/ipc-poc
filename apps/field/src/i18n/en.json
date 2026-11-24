@@ -236,5 +236,67 @@
       "version_retired": "This checklist version can no longer be sent.",
       "read_only": "This draft is read-only."
     }
+  },
+  "tasks": {
+    "title": "My tasks",
+    "description": "Tasks assigned to you. They stay on this phone so you can work offline.",
+    "detailTitle": "Task",
+    "back": "Back to my tasks",
+    "listLabel": "My tasks",
+    "empty": {
+      "title": "No open tasks",
+      "description": "When a task is assigned to you it appears here."
+    },
+    "offlineList": "You are offline. This list was saved at {{time}}.",
+    "offlineTask": "You are offline. This is the copy saved on this phone.",
+    "due": "Due {{date}}",
+    "overdue": "Overdue since {{date}}",
+    "overdueTag": "overdue",
+    "blocked": "Blocked",
+    "blockedBecause": "Flagged as blocked: {{reason}}",
+    "returned": "Returned: {{reason}}",
+    "returnedShort": "Returned: {{reason}}",
+    "dueLabel": "Due",
+    "proofLabel": "Proof",
+    "validationLabel": "Checked by",
+    "returnsLabel": "Times returned",
+    "photosNeeded_one": "{{count}} photo needed",
+    "photosNeeded_other": "{{count}} photos needed",
+    "noPhotoNeeded": "No photo needed",
+    "secondValidation": "Supervisor, then IPC officer or district quality manager",
+    "supervisorOnly": "Ward supervisor",
+    "start": "Start task",
+    "started": "Task started.",
+    "startQueued": "Start saved. It will be sent when you are online.",
+    "dependencyOpen": "You cannot start yet. Finish first: {{tasks}}.",
+    "conflict": "Someone changed this task. The latest version is shown; check it and try again.",
+    "actionFailed": "That did not work. Try again, or ask your supervisor.",
+    "proofTitle": "Upload proof",
+    "photosReady": "Photos ready to send",
+    "photoN": "Photo {{n}}",
+    "removePhoto": "Remove",
+    "note": "Note (optional)",
+    "submitProof": "Send proof",
+    "proofQueued": "Proof saved. Photos are sent first, then the task.",
+    "waiting": {
+      "EVIDENCE_SUBMITTED": "Waiting for the ward supervisor to check your proof.",
+      "PENDING_VALIDATION": "Accepted by the supervisor. Waiting for the second check."
+    },
+    "openQueue": "See what is waiting to send",
+    "queue": {
+      "start": "Start: {{title}}",
+      "photo": "Proof photo: {{title}}",
+      "submit": "Proof for: {{title}}"
+    }
+  },
+  "reasons": {
+    "MEETS_STANDARD": "Meets the standard",
+    "MEETS_STANDARD_WITH_NOTE": "Meets the standard, with a note",
+    "EVIDENCE_UNCLEAR": "Proof is not clear",
+    "EVIDENCE_INCOMPLETE": "Proof is incomplete",
+    "WRONG_LOCATION_OR_ITEM": "Wrong place or item",
+    "STANDARD_NOT_MET": "Standard not met",
+    "PATIENT_DATA_VISIBLE": "A patient can be identified",
+    "OTHER": "Other"
   }
 }

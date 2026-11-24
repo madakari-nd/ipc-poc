@@ -21,6 +21,6 @@ describe('officer role navigation (FR-036)', () => {
     expect(ALL.filter((r) => canSee(r, 'admin'))).toEqual(['STATE_ADMIN']);
   });
   it('gives the external auditor read-only areas only', () => {
-    expect(navFor('EXTERNAL_AUDITOR').map((n) => n.section)).toEqual(['home', 'plans', 'ledger']);
+    expect(navFor('EXTERNAL_AUDITOR').map((n) => n.section)).toEqual(['home', 'assessments', 'plans', 'ledger']);
   });
 });

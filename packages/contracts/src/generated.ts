@@ -1626,6 +1626,9 @@ export interface paths {
          *     evidence-based kinds: `PHOTO_NO_GPS`, `GPS_FAR_FROM_FACILITY` (> 1 km from the facility point),
          *     `DEVICE_CLOCK_SKEW` (> 10 min), `LATE_UPLOAD` (capture to upload > 7 days) and
          *     `DUPLICATE_PHOTO_ACROSS_WARDS` (same SHA-256 in two wards).
+         *     Also returns `deviceQueues`: every reported device outbox (DeviceQueueStatus, owned by the Edge)
+         *     that still holds unsent items (`pendingCount > 0`). Workflow applies the 72 h rule on programme
+         *     time and turns the old ones into `STALE_DEVICE_QUEUE` exceptions.
          */
         get: operations["edgeInternalEvidenceDQ"];
         put?: never;
@@ -2760,6 +2763,12 @@ export interface components {
             /** Format: uuid */
             deviceId?: string;
             cycleId?: components["schemas"]["ObjectId"];
+            /** @description Display name from the workflow register (set by workflow). */
+            facilityName?: string;
+            /** @description Display name from the workflow register (set by workflow). */
+            wardName?: string;
+            /** @description Uploader or device user display name when known (set by workflow). */
+            userName?: string;
             /** @description Kind-specific value, e.g. distanceM, skewSec, uploadDelayHours, oldestPendingHours. */
             metric?: {
                 [key: string]: number;
@@ -6011,6 +6020,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Page"] & {
                         items: components["schemas"]["DataQualityException"][];
+                        /** @description Device outboxes with unsent items (pendingCount > 0), for the stale-device rule. */
+                        deviceQueues?: components["schemas"]["DeviceQueueStatus"][];
                     };
                 };
             };

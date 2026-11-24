@@ -82,6 +82,23 @@ describe('evidence data-quality exceptions (edgeInternalEvidenceDQ, FR-026)', ()
     expect(paginate([1, 2, 3], p1.nextCursor!, 2)).toEqual({ items: [3], nextCursor: null });
   });
 
+  it('returns device outboxes with unsent items for the stale-device rule (deviceQueues)', async () => {
+    const dev = (deviceId: string, userId: string, pendingCount: number, oldest: string | null) => db.models.DeviceQueue.create({
+      deviceId, userId, pendingCount, failedCount: 0, oldestPendingAt: oldest ? new Date(oldest) : null,
+      reportedAt: new Date(now), receivedAt: new Date(now),
+    });
+    const stale = randomUUID();
+    await dev(stale, 'frontA1', 3, '2026-11-15T10:00:00Z');
+    await dev(randomUUID(), 'frontA2', 0, null); // empty outbox: not listed
+    const token = await signServiceJwt(SECRET, undefined, { issuer: 'ipc-workflow', audience: 'ipc-edge' });
+    const res = await request(h.priv).get('/internal/evidence/data-quality').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.deviceQueues).toEqual([{
+      deviceId: stale, userId: 'frontA1', pendingCount: 3, failedCount: 0, oldestPendingAt: '2026-11-15T10:00:00.000Z',
+      reportedAt: new Date(now).toISOString(), receivedAt: new Date(now).toISOString(),
+    }]);
+  });
+
   it('is served on the private listener only, behind a service JWT', async () => {
     await ev({ gps: null, gpsUnavailable: true, wardId: WB1, facilityId: FB });
     const token = await signServiceJwt(SECRET, undefined, { issuer: 'ipc-workflow', audience: 'ipc-edge' });

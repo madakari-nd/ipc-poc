@@ -56,6 +56,20 @@ export const ELEVATE_ALLOW_LIST: readonly AllowRule[] = [
   { id: 'E11.session.accept', service: 'mentoring', method: 'POST', pattern: /^\/mentoring\/v1\/requestSessions\/accept$/ },
   { id: 'E11.session.reject', service: 'mentoring', method: 'POST', pattern: /^\/mentoring\/v1\/requestSessions\/reject$/ },
   { id: 'E11.session.list', service: 'mentoring', method: 'GET', pattern: /^\/mentoring\/v1\/requestSessions\/list$/ },
+  // US6 (E10): mentor open-slot probe for the shortlist (mentors/list is broken on this stack).
+  {
+    id: 'E10.availability.isAvailable',
+    service: 'mentoring',
+    method: 'GET',
+    pattern: new RegExp(`^/mentoring/v1/availability/isAvailable/${SEG}$`),
+  },
+  // US6 (E10): the mentor's display name for the shortlist (read-only profile).
+  {
+    id: 'E10.mentor.details',
+    service: 'mentoring',
+    method: 'GET',
+    pattern: new RegExp(`^/mentoring/v1/mentors/details/${SEG}$`),
+  },
 ];
 
 /** Returns the matching allow-list rule, or null (→ 404). Paths with dot-segments never match. */

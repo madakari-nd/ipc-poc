@@ -86,7 +86,13 @@ export function idempotency(models: EdgeModels, logger: Logger, o: IdempotencyOp
       captured = body;
       return json(body);
     };
-    res.on('finish', () => {
+    // Settled when the handler has answered, even if the client went away first (offline device,
+    // page navigation), so a retry with the same key replays instead of waiting for the lock to
+    // expire. A request that never answers keeps its lock (crash recovery).
+    let settled = false;
+    const settle = () => {
+      if (settled || !res.writableEnded) return;
+      settled = true;
       const status = res.statusCode;
       const done =
         status >= 500
@@ -108,7 +114,15 @@ export function idempotency(models: EdgeModels, logger: Logger, o: IdempotencyOp
               },
             );
       done.catch((err: unknown) => logger.error({ err }, 'idempotency record update failed'));
-    });
+    };
+    res.on('finish', settle);
+    // The handler may answer after the client has gone (no 'finish' then): settle on end() too.
+    const end = res.end.bind(res) as (...a: unknown[]) => Response;
+    res.end = ((...args: unknown[]) => {
+      const out = end(...args);
+      settle();
+      return out;
+    }) as Response['end'];
     next();
   };
 }

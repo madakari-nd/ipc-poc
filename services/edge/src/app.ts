@@ -26,6 +26,11 @@ import { meRoutes } from './routes/me.routes.js';
 import { adminRoutes, type AdminGateways } from './routes/admin.routes.js';
 import { assessmentRoutes, type AssessmentRouteDeps } from './routes/assessments.routes.js';
 import { planRoutes } from './routes/plans.routes.js';
+import { taskRoutes } from './routes/tasks.routes.js';
+import { supportRoutes, type SupportRouteDeps } from './routes/support.routes.js';
+import { oversightRoutes } from './routes/oversight.routes.js';
+import { comparisonRoutes } from './routes/comparisons.routes.js';
+import { releaseRoutes } from './routes/release.routes.js';
 import type { Forwarder } from './routes/admin.routes.js';
 import { Auditor } from './scope/audit.js';
 import { OwnershipGuard, workflowResolvers } from './scope/ownership.guard.js';
@@ -74,6 +79,12 @@ export interface EdgeDeps {
   assessments?: AssessmentRouteDeps;
   /** US3 plans: mirrored to workflow (defaults to the admin workflow forwarder). */
   plans?: Forwarder;
+  /** US4 tasks: mirrored to workflow (defaults to the plan forwarder). */
+  tasks?: Forwarder;
+  /** US6 expert support: workflow + ELEVATE mentoring with the user's token. Absent → 503 on those routes. */
+  support?: SupportRouteDeps;
+  /** US8 oversight read models: mirrored to workflow (defaults to the admin workflow forwarder). */
+  oversight?: Forwarder;
 }
 
 /** Strict CSP for a JSON API: nothing may load, frame or submit (Constitution XIII). */
@@ -186,6 +197,14 @@ export function createApps(deps: EdgeDeps) {
   if (deps.admin) v1.use(adminRoutes(deps.admin));
   const planForwarder = deps.plans ?? deps.admin?.workflow;
   if (planForwarder) v1.use(planRoutes(planForwarder, guard, audit));
+  // US4: task queues, transitions and history (evidence rule checked here against the locker).
+  const taskForwarder = deps.tasks ?? planForwarder;
+  if (taskForwarder) v1.use(taskRoutes(taskForwarder, guard, audit, models));
+  const oversightForwarder = deps.oversight ?? deps.admin?.workflow;
+  if (oversightForwarder) v1.use(oversightRoutes(oversightForwarder, audit));
+  // US7: comparison, ward trend and release of held external results (mirrored to workflow).
+  if (planForwarder) v1.use(comparisonRoutes(planForwarder, guard, audit, wards), releaseRoutes(planForwarder, guard, audit));
+  v1.use(supportRoutes(deps.support, { sessions, audit, scopes, logger }));
   v1.use(historyRoutes(deps.history ?? noHistory, guard, audit));
   pub.use('/ipc/v1', v1);
   errorTail(pub, logger);

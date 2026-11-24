@@ -11,6 +11,8 @@ export interface AssessmentContext extends Meta {
   baselineOfId?: Types.ObjectId; declaration?: { accepted: true; at: Date };
   status: 'draft' | 'submitted' | 'completed'; completedAt?: Date;
   scores?: { total?: number; bySection?: Map<string, number> }; failedQuestionKeys: string[];
+  /** Score per programme question key, recorded at completion (US7 cross-version comparison). */
+  questionScores?: Map<string, number>;
   releaseState: 'n/a' | 'held' | 'released'; releasedBy?: string; releasedAt?: Date; evidenceIds: Types.ObjectId[];
 }
 export const AssessmentContextModel = modelFor<AssessmentContext>('AssessmentContext', defineSchema('assessment_contexts', {
@@ -30,6 +32,7 @@ export const AssessmentContextModel = modelFor<AssessmentContext>('AssessmentCon
   completedAt: Date,
   scores: { total: { type: Number, min: 0 }, bySection: { type: Map, of: Number } },
   failedQuestionKeys: [text({ max: 64 })],
+  questionScores: { type: Map, of: Number },
   releaseState: text({ required: true, enum: ['n/a', 'held', 'released'] }),
   releasedBy: elevateId(),
   releasedAt: Date,

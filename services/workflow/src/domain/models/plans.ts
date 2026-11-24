@@ -84,6 +84,10 @@ export interface Task extends Meta {
   rejectionCount: number; blocked?: { reason: string; by: string; at: Date } | null; supportRequestId?: Types.ObjectId;
   carriedOverFromTaskId?: Types.ObjectId; reopenedFromTaskId?: Types.ObjectId; elevateTaskId?: string;
   currentEvidenceIds: Types.ObjectId[]; syncState: 'in_sync' | 'pending' | 'diverged';
+  /** US4: SHA-256 of the current evidence as attested by the Edge evidence locker at submission. */
+  currentEvidenceHashes?: string[];
+  /** US4: the latest return (supervisor or validator), shown to the owner. */
+  lastReturnReason?: { reasonCode: string; reasonText?: string } | null;
 }
 export const TaskModel = modelFor<Task>('Task', defineSchema('tasks', {
   planId: ref(true),
@@ -108,6 +112,11 @@ export const TaskModel = modelFor<Task>('Task', defineSchema('tasks', {
   elevateTaskId: elevateId(),
   currentEvidenceIds: [ref()],
   syncState: text({ required: true, enum: ['in_sync', 'pending', 'diverged'] }),
+  currentEvidenceHashes: { type: [{ type: String, match: /^[a-f0-9]{64}$/, maxlength: 64 }], default: undefined },
+  lastReturnReason: {
+    type: new Schema({ reasonCode: text({ required: true, max: 40 }), reasonText: text() }, { _id: false }),
+    default: undefined,
+  },
 }));
 
 // ---- Decision (§4)

@@ -29,6 +29,8 @@ export const workflowConfigSchema = z
     SERVICE_JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
     SERVICE_JWT_ISSUERS: list('ipc-edge,ipc-adapters'),
     SERVICE_JWT_AUDIENCE: z.string().min(1).default('ipc-workflow'),
+    /** Edge private listener (edgeInternalEvidenceDQ for the US8 data-quality list). */
+    EDGE_INTERNAL_URL: z.string().url().default('http://edge:8081'),
     SCHEDULER_SHARED_SECRET: z.string().min(16),
     ELEVATE_KAFKA_BROKERS: list('').describe('comma-separated host:port list'),
     /** ELEVATE organisation of this profile: consumed events from any other org are ignored (E16). */

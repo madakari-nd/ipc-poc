@@ -90,6 +90,7 @@ export class ObservationCompletedConsumer extends BaseConsumer<Completed | { sta
     const result = {
       status: 'completed' as const, completedAt: ctx?.completedAt ?? completedAt, isBaselineForCycle: firstInCycle,
       scores: { total: score.total, bySection: score.bySection }, failedQuestionKeys: score.failedQuestionKeys,
+      questionScores: score.byQuestion,
     };
     if (!ctx) {
       const [doc] = await AssessmentContextModel.create([{

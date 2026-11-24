@@ -25,7 +25,16 @@ import { assessmentContextRoutes } from './routes/internal/assessment-context.ro
 import type { AssessmentService } from './services/assessment.service.js';
 import { internalIdempotency } from './middleware/idempotency.js';
 import { planRoutes } from './routes/plans.routes.js';
+import { oversightRoutes } from './routes/oversight.routes.js';
+import type { OversightService } from './services/oversight.service.js';
+import { taskRoutes } from './routes/tasks.routes.js';
+import type { TaskService } from './services/task.service.js';
 import type { PlanService } from './services/plan.service.js';
+import { comparisonRoutes } from './routes/comparison.routes.js';
+import type { ComparisonService } from './services/comparison.service.js';
+import type { ReleaseService } from './services/release.service.js';
+import { supportRoutes } from './routes/support.routes.js';
+import type { SupportService } from './services/support.service.js';
 
 export interface AppDeps {
   logger: Logger;
@@ -41,6 +50,14 @@ export interface AppDeps {
   assessment?: AssessmentService;
   /** US3 plans: mirrored `/ipc/v1/plans*` (draft queue, edit, approve, revisions). */
   plans?: PlanService;
+  /** US8 oversight: mirrored `/ipc/v1/oversight/*` read models. */
+  oversight?: OversightService;
+  /** US4 tasks: mirrored `/ipc/v1/tasks*` (queues, transitions, history). */
+  tasks?: TaskService;
+  /** US7 repeat assessment: mirrored comparison, ward trend and release of held external results. */
+  comparison?: { comparison: ComparisonService; release: ReleaseService };
+  /** US6 expert support: mirrored `/ipc/v1/support-requests*` (ELEVATE mentoring facts come from the Edge). */
+  support?: SupportService;
 }
 
 /** Express app: platform middleware → /internal (service JWT) → health → problem+json errors. */
@@ -65,6 +82,14 @@ export function createApp(d: AppDeps): { app: Express; health: HealthRouter } {
   if (d.assessment) app.use(assessmentRoutes({ jwt: d.jwt, assessment: d.assessment, scope: d.scope }));
   // Mirrored public plan routes (US3, T085/T087).
   if (d.plans) app.use(planRoutes({ jwt: d.jwt, plans: d.plans, scope: d.scope }));
+  // Mirrored public oversight routes (US8, T116/T117).
+  if (d.oversight) app.use(oversightRoutes({ jwt: d.jwt, oversight: d.oversight, scope: d.scope }));
+  // Mirrored public task routes (US4, T092/T093).
+  if (d.tasks) app.use(taskRoutes({ jwt: d.jwt, tasks: d.tasks, scope: d.scope }));
+  // Mirrored public comparison/trend/release routes (US7, T111).
+  if (d.comparison) app.use(comparisonRoutes({ jwt: d.jwt, ...d.comparison, scope: d.scope }));
+  // Mirrored public support routes (US6, T106/T107).
+  if (d.support) app.use(supportRoutes({ jwt: d.jwt, support: d.support, scope: d.scope }));
   // Root /healthz, /readyz (container healthcheck), /dependencies and /metrics (Prometheus) on the private network.
   app.use(health);
 
