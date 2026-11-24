@@ -9,6 +9,7 @@ import { CatalogueService } from './services/catalogue.service.js';
 import { UnconfiguredElevateAdmin, type ElevateAdminPort } from './services/elevate-admin.gateway.js';
 import { EscalationService } from './services/escalation.service.js';
 import { NotificationService, type EmailSender } from './services/notification.service.js';
+import { HomeService } from './services/home.service.js';
 
 export interface WorkflowContext {
   clock: ClockService;
@@ -19,6 +20,7 @@ export interface WorkflowContext {
   admin: AdminService;
   notifications: NotificationService;
   escalations: EscalationService;
+  home: HomeService;
 }
 
 /** Composition root for domain services (server, scripts and tests share it). */
@@ -40,5 +42,6 @@ export function createContext(o: {
   const admin = new AdminService({ ledger, scope, catalogue, elevate, profile: o.profile, demoMode: () => clock.allowed });
   const notifications = new NotificationService({ outbox, email: o.email, logger: undefined });
   const escalations = new EscalationService({ ledger, outbox, programmeNow: () => clock.programmeNow(), notifications });
-  return { clock, ledger, outbox, scope, catalogue, admin, notifications, escalations };
+  const home = new HomeService(() => clock.programmeNow());
+  return { clock, ledger, outbox, scope, catalogue, admin, notifications, escalations, home };
 }

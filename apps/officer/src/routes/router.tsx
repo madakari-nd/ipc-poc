@@ -8,6 +8,8 @@ import { WithDemoClockBanner } from '../features/admin/DemoClock.js';
 import { PlanRoute } from '../features/plans/PlanRoute.js';
 import { PlansRoute } from '../features/plans/PlansRoute.js';
 import { SupportRoute } from '../features/support/SupportRoute.js';
+import { EscalationsRoute } from '../features/escalations/EscalationsRoute.js';
+import { NotificationsRoute } from '../features/escalations/NotificationsRoute.js';
 import { AssessmentsRoute } from '../features/comparison/AssessmentsRoute.js';
 import { ComparisonRoute } from '../features/comparison/ComparisonView.js';
 import { OversightRoute } from '../features/oversight/OversightRoute.js';
@@ -45,6 +47,8 @@ export const routes = [
               { path: 'assessments/:assessmentId/comparison', element: <ComparisonRoute /> },
               { path: 'oversight', element: <OversightRoute /> },
               { path: 'support', element: <SupportRoute /> },
+              { path: 'escalations', element: <EscalationsRoute /> },
+              { path: 'notifications', element: <NotificationsRoute /> },
               { path: 'reviews', element: <TaskQueueRoute section="reviews" /> },
               { path: 'reviews/:taskId', element: <TaskReviewRoute section="reviews" /> },
               { path: 'validations', element: <TaskQueueRoute section="validations" /> },

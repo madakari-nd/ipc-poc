@@ -38,6 +38,8 @@ import type { SupportService } from './services/support.service.js';
 import { escalationRoutes } from './routes/escalation.routes.js';
 import type { EscalationService } from './services/escalation.service.js';
 import type { NotificationService } from './services/notification.service.js';
+import { homeRoutes } from './routes/home.routes.js';
+import type { HomeService } from './services/home.service.js';
 
 export interface AppDeps {
   logger: Logger;
@@ -67,6 +69,8 @@ export interface AppDeps {
   notifications?: NotificationService;
   /** US5 internal: scheduler `sweep` + demo `run-now` on the private network. */
   escalationInternal?: Router;
+  /** Home cards (`/ipc/v1/me/home`): "what needs me now" per role (T045 + US5). */
+  home?: HomeService;
 }
 
 /** Express app: platform middleware → /internal (service JWT) → health → problem+json errors. */
@@ -100,6 +104,8 @@ export function createApp(d: AppDeps): { app: Express; health: HealthRouter } {
   if (d.comparison) app.use(comparisonRoutes({ jwt: d.jwt, ...d.comparison, scope: d.scope }));
   // Mirrored public support routes (US6, T106/T107).
   if (d.support) app.use(supportRoutes({ jwt: d.jwt, support: d.support, scope: d.scope }));
+  // Mirrored home cards (T045 + US5): "what needs me now", counted within scope.
+  if (d.home) app.use(homeRoutes({ jwt: d.jwt, home: d.home }));
   // Mirrored public escalation + notification routes (US5, T100/T101).
   if (d.escalations && d.admin) {
     app.use(escalationRoutes({ jwt: d.jwt, escalations: d.escalations, notifications: d.notifications, scope: d.scope, clock: d.admin.clock }));

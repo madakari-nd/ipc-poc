@@ -108,6 +108,7 @@ async function main() {
     }),
     escalations: ctx.escalations,
     notifications: ctx.notifications,
+    home: ctx.home,
     comparison: {
       comparison: new ComparisonService({ assessment }),
       release: new ReleaseService({ assessment, ledger: ctx.ledger, outbox: ctx.outbox, programmeNow: () => ctx.clock.programmeNow() }),

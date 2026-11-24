@@ -108,8 +108,8 @@ describe('R1/R2 overdue sweep (FR-020, proposal A11)', () => {
     const r1 = await ctx.escalations.sweep('schedule');
     expect(r1.evaluatedTasks).toBe(1);
     expect(r1.created).toHaveLength(1);
-    expect(r1.created[0]).toMatchObject({ ruleCode: 'R1', level: 2, targetRole: 'IPC_OFFICER', vacantTargetFlag: false });
-    expect(r1.created[0].targetUserIds).toEqual(['officerA']);
+    expect(r1.created[0]!).toMatchObject({ ruleCode: 'R1', level: 2, targetRole: 'IPC_OFFICER', vacantTargetFlag: false });
+    expect(r1.created[0]!.targetUserIds).toEqual(['officerA']);
     expect(await EscalationModel.countDocuments()).toBe(1);
     expect(await NotificationModel.countDocuments()).toBe(2); // inapp + email for one target
     expect(await LedgerRecordModel.countDocuments({ action: 'task.escalated' })).toBe(1);
@@ -168,7 +168,7 @@ describe('R3 on-return hook (FR-020)', () => {
     await TaskModel.create([t]);
     await withTx(async (session) => {
       await ctx.escalations.onReturn({
-        task: t as never, wardId: W4, facilityId: String(FA), kind: 'return', rejectionCount: 2,
+        task: t as never, wardId: String(W4), facilityId: String(FA), kind: 'return', rejectionCount: 2,
         decisionId: new Types.ObjectId().toHexString(), actor: { userId: 'sup1', role: 'WARD_SUPERVISOR' }, session,
       });
     });

@@ -107,6 +107,48 @@
       "import_jobs": "Imports"
     }
   },
+  "escalations": {
+    "intro": "Tasks escalated by rule or manually. The task owner and history are unchanged.",
+    "list": {
+      "emptyTitle": "No escalations",
+      "emptyDescription": "Nothing has been escalated yet. Overdue critical tasks and repeated rejections escalate by rule.",
+      "level": "Level {{level}}",
+      "vacant": "Target vacant — escalated up",
+      "raisedAt": "Raised {{at}}",
+      "openTask": "Open the task"
+    },
+    "sweep": {
+      "runNow": "Run sweep now",
+      "running": "Running…",
+      "result": "{{n}} escalation(s) created"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unread": "{{count}} unread",
+    "list": {
+      "emptyTitle": "No notifications",
+      "emptyDescription": "You have no notifications yet."
+    },
+    "markRead": "Mark as read",
+    "channels": {
+      "inapp": "In app",
+      "email": "Email",
+      "sms": "SMS"
+    },
+    "status": {
+      "queued": "Queued",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "read": "Read"
+    },
+    "templates": {
+      "task": {
+        "escalated": "A task needs attention"
+      }
+    }
+  },
   "section": {
     "backHome": "Back to home",
     "comingSoon": {
