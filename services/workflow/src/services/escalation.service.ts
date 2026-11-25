@@ -44,6 +44,8 @@ export class EscalationService {
       programmeNow: () => Date;
       notifications?: NotificationService;
       logger?: Logger;
+      /** ELEVATE user id → email (for the email channel). Injected by the server. */
+      emailOf?: (userId: string) => Promise<string | undefined>;
     },
   ) {
     this.notifications = d.notifications ?? new NotificationService({ outbox: d.outbox, logger: d.logger });
@@ -127,9 +129,11 @@ export class EscalationService {
     // Notify every target user on each rule channel. A vacant target gets nobody to notify.
     const notificationIds: Types.ObjectId[] = [];
     for (const userId of targetUserIds) {
+      const email = this.d.emailOf ? await this.d.emailOf(userId) : undefined;
       for (const channel of channels) {
         const n = await this.notifications.notify({
           userId,
+          ...(email && channel === 'email' ? { email } : {}),
           channel,
           templateCode: 'task.escalated',
           params: { taskId: String(facts.task._id), rule: ruleCode, level: target.level, reason },

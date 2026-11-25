@@ -33,6 +33,8 @@ export function createContext(o: {
   codePrefix?: string;
   /** ELEVATE notification client; absent → email notifications stay `queued` (demo never blocks). */
   email?: EmailSender;
+  /** ELEVATE user id → email, for the escalation email channel (FR-021). */
+  emailOf?: (userId: string) => Promise<string | undefined>;
 }): WorkflowContext {
   const clock = new ClockService({ profile: o.profile, demoMode: o.demoMode });
   const ledger = new LedgerService(() => clock.programmeNow());
@@ -42,7 +44,7 @@ export function createContext(o: {
   const elevate = o.elevate ?? new UnconfiguredElevateAdmin(['ELEVATE_* settings']);
   const catalogue = new CatalogueService({ ledger, outbox, elevate, programmeNow: () => clock.programmeNow(), prefix: o.codePrefix });
   const notifications = new NotificationService({ outbox, email: o.email, logger: undefined });
-  const escalations = new EscalationService({ ledger, outbox, programmeNow: () => clock.programmeNow(), notifications });
+  const escalations = new EscalationService({ ledger, outbox, programmeNow: () => clock.programmeNow(), notifications, ...(o.emailOf ? { emailOf: o.emailOf } : {}) });
   const home = new HomeService(() => clock.programmeNow());
   const retention = new RetentionService({ ledger, profile: o.profile });
   const admin = new AdminService({ ledger, scope, catalogue, elevate, profile: o.profile, demoMode: () => clock.allowed, retention });

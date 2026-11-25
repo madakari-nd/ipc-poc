@@ -86,6 +86,8 @@ test.beforeAll(async () => {
   ctx = createContext({
     profile: PROFILE as 'test', demoMode: true,
     email: createEmailSender({ brokers: (env.ELEVATE_KAFKA_BROKERS ?? 'localhost:9092').split(','), topic: env.ELEVATE_NOTIFICATION_TOPIC ?? 'dev.notifications', clientId: 'ipc-us5-e2e' }),
+    // Seed-state map: ELEVATE user id -> email, so the email channel reaches Mailpit (FR-021).
+    emailOf: async (userId) => Object.values(state!.users).find((u) => String(u.id) === userId)?.email,
   });
   await ctx.clock.refresh();
   const { app: wfApp } = createApp({
@@ -151,7 +153,20 @@ test.beforeAll(async () => {
     dueAt: new Date(Date.now() - 2 * 86_400_000), dependsOnTaskIds: [], evidenceRule: { photoRequired: true, minPhotos: 1 }, secondValidation: true,
     state: 'IN_PROGRESS', rejectionCount: 0, blocked: null, currentEvidenceIds: [], syncState: 'pending', v: 0,
   }]);
+
+  // Re-runnable on the live stack: clear this run's escalations, notifications and clock shift.
+  const sUsers = Object.values(s.users);
+  await mongoDb().collection('escalations').deleteMany({ taskId: TASK_ID });
+  await mongoDb().collection('notifications').deleteMany({ userId: { $in: sUsers.map((u) => String(u.id)) }, templateCode: 'task.escalated' });
+  const clockView = await ctx.clock.view();
+  if (!clockView.isRealTime) await ctx.clock.reset(SYSTEM_ADMIN(), 'US5 e2e: reset before run');
+  baseEscalations = await LedgerRecordModel.countDocuments({ action: 'task.escalated' });
 });
+
+function mongoDb() {
+  return mongoose.connection.db!;
+}
+let baseEscalations = 0;
 
 test.afterAll(async () => {
   await TaskModel.collection.deleteOne({ _id: TASK_ID }).catch(() => undefined);
@@ -221,7 +236,7 @@ test('R1 fires at +3 days to the IPC officer; R2 at +7 days to the district QM; 
   const esc1 = await EscalationModel.findOne({ taskId: TASK_ID, ruleCode: 'R1' }).lean();
   expect(esc1).toMatchObject({ level: 2, targetRole: 'IPC_OFFICER' });
   expect(esc1!.targetUserIds).toContain(String(state!.users['officer-a']!.id));
-  expect(await LedgerRecordModel.countDocuments({ action: 'task.escalated' })).toBe(1);
+  expect(await LedgerRecordModel.countDocuments({ action: 'task.escalated' })).toBe(baseEscalations + 1);
   const notifs = await NotificationModel.find({ userId: String(state!.users['officer-a']!.id), templateCode: 'task.escalated' }).lean();
   expect(notifs.map((n) => n.channel).sort()).toEqual(['email', 'inapp']);
   const ownerAfter = (await TaskModel.findById(TASK_ID).lean())!;
@@ -239,7 +254,7 @@ test('R1 fires at +3 days to the IPC officer; R2 at +7 days to the district QM; 
   expect(esc2).toMatchObject({ level: 3, targetRole: 'DISTRICT_QM' });
   expect(esc2!.targetUserIds).toContain(String(state!.users['qm-d1']!.id));
   expect(await EscalationModel.countDocuments({ taskId: TASK_ID })).toBe(2);
-  expect(await LedgerRecordModel.countDocuments({ action: 'task.escalated' })).toBe(2);
+  expect(await LedgerRecordModel.countDocuments({ action: 'task.escalated' })).toBe(baseEscalations + 2);
 
   // A third sweep creates nothing new (idempotent on task + rule + level).
   const sweep3 = await api(sa.page, sa.csrf, 'POST', '/ipc/v1/demo/escalation-sweep', {});

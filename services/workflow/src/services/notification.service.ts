@@ -23,6 +23,8 @@ export type NotificationChannel = 'inapp' | 'email' | 'sms';
 
 export interface NotifyInput {
   userId: string;
+  /** Recipient email for the email channel (ELEVATE notification delivers to this address). */
+  email?: string;
   channel: NotificationChannel;
   templateCode: string;
   params: Record<string, string | number | boolean>;
@@ -67,7 +69,7 @@ export class NotificationService {
     if (input.channel === 'email' && this.deps.email) {
       try {
         await this.deps.email.sendEmail(
-          { to: input.userId, subject: templateSubject(input.templateCode), body: templateBody(input.templateCode, input.params) },
+          { to: input.email ?? input.userId, subject: templateSubject(input.templateCode), body: templateBody(input.templateCode, input.params) },
           `notification-${String(notif._id)}`,
         );
         notif.status = 'sent';

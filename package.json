@@ -34,7 +34,7 @@
     "down": "bash scripts/down.sh",
     "test:integration": "vitest run --project integration",
     "test:security": "vitest run --project security",
-    "test:e2e": "playwright test",
+    "test:e2e": "NODE_OPTIONS=--experimental-transform-types playwright test",
     "prepare": "husky",
     "ledger:tamper-demo": "tsx scripts/ledger-tamper-demo.ts",
     "security:report": "tsx scripts/security-report.ts"

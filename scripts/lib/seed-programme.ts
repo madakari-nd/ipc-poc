@@ -211,20 +211,28 @@ export class ProgrammeSeeder {
     const validFrom = new Date(CYCLES[0]!.startsAt);
     for (const person of PEOPLE) {
       const userId = String(users[person.slug]!.id);
+      const email = users[person.slug]!.email;
       scopes[person.slug] = describe(person.scope);
       const scope = toScope(person.scope);
       const existing = await ScopeAssignmentModel.findOne({ userId, role: person.role }).lean();
       if (!existing) {
-        await scopeService.assign({ userId, role: person.role, scope, validFrom, source: 'hr_import' }, SYSTEM, 'demo seed');
+        await scopeService.assign({ userId, role: person.role, scope, validFrom, source: 'hr_import', email }, SYSTEM, 'demo seed');
         this.writes++; this.ledgerRecords++;
-      } else if (changed(existing as unknown as Record<string, unknown>, { scope })) {
-        // A changed demo scope is a new assignment: end the old one, add the new (history kept).
-        await withTx(async (session) => {
-          await ScopeAssignmentModel.updateOne({ _id: existing._id }, { $set: { validTo: new Date() }, $inc: { v: 1 } }, { session });
-          await this.ledger.append({ actor: SYSTEM, action: 'scope.changed', subject: { type: 'scope_assignment', id: String(existing._id) }, reason: 'demo seed: scope ended', correlationId: this.correlationId }, session);
-        });
-        await scopeService.assign({ userId, role: person.role, scope, validFrom: new Date(), source: 'hr_import' }, SYSTEM, 'demo seed: scope changed');
-        this.writes += 2; this.ledgerRecords += 2;
+      } else {
+        if ((existing as { email?: string }).email !== email) {
+          // Backfill the ELEVATE email onto pre-existing assignments so the escalation email channel reaches a real address (FR-021).
+          await ScopeAssignmentModel.updateOne({ _id: existing._id }, { $set: { email } });
+          this.writes++;
+        }
+        if (changed(existing as unknown as Record<string, unknown>, { scope })) {
+          // A changed demo scope is a new assignment: end the old one, add the new (history kept).
+          await withTx(async (session) => {
+            await ScopeAssignmentModel.updateOne({ _id: existing._id }, { $set: { validTo: new Date() }, $inc: { v: 1 } }, { session });
+            await this.ledger.append({ actor: SYSTEM, action: 'scope.changed', subject: { type: 'scope_assignment', id: String(existing._id) }, reason: 'demo seed: scope ended', correlationId: this.correlationId }, session);
+          });
+          await scopeService.assign({ userId, role: person.role, scope, validFrom: new Date(), source: 'hr_import', email }, SYSTEM, 'demo seed: scope changed');
+          this.writes += 2; this.ledgerRecords += 2;
+        }
       }
       if (person.mentor) {
         await this.upsert(MentorProfileCacheModel, 'programme', { elevateMentorId: userId }, {

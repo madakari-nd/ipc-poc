@@ -19,6 +19,7 @@ import { ElevateAdminGateway, UnconfiguredElevateAdmin } from './services/elevat
 import { internalEscalationRoutes } from './routes/internal/escalation.routes.js';
 import { createEmailSender } from './services/notification.email.js';
 import { RetentionJob } from './jobs/retention.job.js';
+import { ScopeAssignmentModel } from './domain/models/index.js';
 
 const logger = createLogger('workflow');
 
@@ -50,6 +51,7 @@ async function main() {
     codePrefix: cfg.IPC_CODE_PREFIX,
     elevate: 'missing' in gateway ? new UnconfiguredElevateAdmin(gateway.missing) : gateway,
     email: createEmailSender({ brokers: cfg.ELEVATE_KAFKA_BROKERS, topic: cfg.ELEVATE_NOTIFICATION_TOPIC, clientId: cfg.KAFKA_CLIENT_ID }),
+    emailOf: async (userId) => (await ScopeAssignmentModel.findOne({ userId, email: { $exists: true } }, { email: 1 }).lean<{ email?: string }>())?.email,
   });
   await ctx.clock.refresh();
   const clockTimer = setInterval(() => {

@@ -66,11 +66,11 @@ export class ScopeService {
   }
 
   /** Creates an assignment after the role ↔ level rule; ledger `scope.changed` in the same transaction. */
-  async assign(input: ScopeAssignmentInput & { source: 'hr_import' | 'admin' }, actor: LedgerActor, reason?: string): Promise<ScopeAssignmentDto> {
+  async assign(input: ScopeAssignmentInput & { source: 'hr_import' | 'admin'; email?: string }, actor: LedgerActor, reason?: string): Promise<ScopeAssignmentDto> {
     const valid = validateScopeAssignment(input);
     return withTx(async (session) => {
       const [doc] = await ScopeAssignmentModel.create(
-        [{ userId: valid.userId, role: valid.role, scope: valid.scope, validFrom: valid.validFrom, validTo: valid.validTo ?? null, source: input.source }],
+        [{ userId: valid.userId, role: valid.role, scope: valid.scope, validFrom: valid.validFrom, validTo: valid.validTo ?? null, source: input.source, ...(input.email ? { email: input.email } : {}) }],
         { session },
       );
       const dto = toScopeAssignmentDto(doc!.toObject() as ScopeAssignmentDoc);

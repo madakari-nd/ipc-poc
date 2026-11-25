@@ -71,6 +71,8 @@ export interface ScopeAssignmentDoc extends Meta {
   userId: string; role: Role; scope: Scope; validFrom: Date; validTo?: Date | null; source: 'hr_import' | 'admin';
   /** Display name for the people picker (listUsers); ELEVATE stays the system of record for users. */
   userName?: string;
+  /** ELEVATE email of the user, carried onto the assignment so the escalation email channel reaches a real address (FR-021). */
+  email?: string;
 }
 const oidString = { type: String, match: OBJECT_ID_RE, maxlength: 24 };
 const scopeSchema = new Schema(
@@ -91,6 +93,7 @@ export const ScopeAssignmentModel = modelFor<ScopeAssignmentDoc>('ScopeAssignmen
   validTo: { type: Date, default: null },
   source: text({ required: true, enum: ['hr_import', 'admin'] }),
   userName: text({ max: 200 }),
+  email: text({ max: 320 }),
 }));
 
 export { localizedText };
