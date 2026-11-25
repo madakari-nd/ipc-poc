@@ -1,0 +1,318 @@
+# Render.com Blueprint — full IPC-POC + ELEVATE deployment.
+# Each service deploys individually (Render does not run docker compose). Weave them together
+# with Environment Groups below (values come from the gitignored infra/compose/.env.prod).
+# Managed where possible: Mongo Atlas, Cloudflare R2, Render Postgres + Redis. Kafka + Zookeeper
+# are self-hosted private services (no managed Kafka on Render).
+#
+# Set the following via the Render dashboard/API before/while applying:
+#  - MONGO_URL (Atlas srv string), WORKFLOW_URL/EDGE_INTERNAL_URL/ADAPTERS_URL (Render private
+#    hostnames), S3_ENDPOINT/S3_PUBLIC_ENDPOINT/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (R2),
+#    all *_(DB_APP_USER|PASSWORD|KEY|SECRET), and the ELEVATE_*_URL/KAFKA_BROKERS/tokens.
+
+environmentGroups:
+  # POC programme-layer settings shared by edge/workflow/adapters/web/cron.
+  - name: ipc-poc
+    envVars:
+      - key: IPC_PROFILE
+        value: prod
+      - key: DEMO_MODE
+        value: "false"
+      - key: IPC_CODE_PREFIX
+        value: PROD-
+      - key: IPC_TOPIC_SUFFIX
+        value: prod
+      - key: IPC_CONSUMER_GROUP
+        value: ipc-workflow-prod
+      # Atlas Mongo (managed replica set → transactions). Set MONGO_URL to the srv string.
+      - key: MONGO_URL
+        sync: false
+      - key: MONGO_DB
+        sync: false
+      # In-Render internal addressing (private hostnames; no compose DNS).
+      - key: WORKFLOW_URL
+        sync: false
+      - key: EDGE_INTERNAL_URL
+        sync: false
+      - key: ADAPTERS_URL
+        sync: false
+      # Evidence object store → Cloudflare R2 (S3-compatible, path-style, zero egress).
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_ENDPOINT
+        sync: false
+      - key: EVIDENCE_BUCKET
+        value: ipc-evidence-prod
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      # Database app role + secrets.
+      - key: WORKFLOW_DB_APP_USER
+        sync: false
+      - key: WORKFLOW_DB_APP_PASSWORD
+        sync: false
+      - key: SESSION_ENCRYPTION_KEY
+        sync: false
+      - key: SERVICE_JWT_SECRET
+        sync: false
+      - key: SCHEDULER_SHARED_SECRET
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+  # ELEVATE addressing (Render private hostnames) + topics + internal tokens.
+  - name: ipc-elevate
+    envVars:
+      - key: ELEVATE_USER_URL
+        sync: false
+      - key: ELEVATE_ENTITY_URL
+        sync: false
+      - key: ELEVATE_SAMIKSHA_URL
+        sync: false
+      - key: ELEVATE_PROJECT_URL
+        sync: false
+      - key: ELEVATE_MENTORING_URL
+        sync: false
+      - key: ELEVATE_SCHEDULER_URL
+        sync: false
+      - key: ELEVATE_KAFKA_BROKERS
+        sync: false
+      - key: ELEVATE_OBSERVATION_TOPIC
+        value: elevate_observations_dev
+      - key: ELEVATE_PROJECT_TOPIC
+        value: sl-improvement-project-submission-dev
+      - key: ELEVATE_NOTIFICATION_TOPIC
+        value: dev.notifications
+      - key: ELEVATE_INTERNAL_ACCESS_TOKEN
+        sync: false
+      - key: ELEVATE_ADMIN_TOKEN_ENTITY
+        sync: false
+      - key: ELEVATE_ADMIN_TOKEN_SAMIKSHA
+        sync: false
+      - key: ELEVATE_ADMIN_TOKEN_PROJECT
+        sync: false
+      - key: ELEVATE_ADMIN_TOKEN_MENTORING
+        sync: false
+      - key: ELEVATE_TENANT_CODE
+        value: default
+      - key: ELEVATE_ORG_ID
+        sync: false
+
+services:
+  # ---- 1. POC app tier ----
+  - type: web
+    name: ipc-web
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: infra/gateway/Dockerfile
+    branch: 001-ipc-programme-poc
+    envVars:
+      - fromGroup: ipc-poc
+      - key: EDGE_URL
+        fromService:
+          name: ipc-edge
+          type: web
+          property: hostport
+      - key: S3_PUBLIC_URL
+        sync: false
+
+  - type: web
+    name: ipc-edge
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: services/edge/Dockerfile
+    branch: 001-ipc-programme-poc
+    envVars:
+      - fromGroup: ipc-poc
+      - fromGroup: ipc-elevate
+    disk:
+      name: edge-data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: worker
+    name: ipc-workflow
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: services/workflow/Dockerfile
+    branch: 001-ipc-programme-poc
+    envVars:
+      - fromGroup: ipc-poc
+      - fromGroup: ipc-elevate
+    disk:
+      name: workflow-data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: worker
+    name: ipc-adapters
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: services/adapters/Dockerfile
+    branch: 001-ipc-programme-poc
+    envVars:
+      - fromGroup: ipc-poc
+      - fromGroup: ipc-elevate
+
+  # Hourly escalation sweep. Replaces the ELEVATE-scheduler callback as the source of truth
+  # (the workflow /internal/escalations/sweep route is private on Render).
+  - type: cron
+    name: ipc-escalation-sweep
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: services/workflow/Dockerfile
+    branch: 001-ipc-programme-poc
+    schedule: "0 * * * *"
+    dockerCommand: curl -sS -X POST -H "X-Scheduler-Secret: $SCHEDULER_SHARED_SECRET" ${WORKFLOW_URL}/internal/escalations/sweep || true
+    envVars:
+      - fromGroup: ipc-poc
+
+  # ---- 2. ELEVATE infra (self-hosted; no managed Kafka/Mongo on Render) ----
+  - type: worker
+    name: elevate-zookeeper
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/confluentinc/cp-zookeeper:7.3.0
+    envVars:
+      - key: ZOOKEEPER_CLIENT_PORT
+        value: "2181"
+      - key: ZOOKEEPER_TICK_TIME
+        value: "2000"
+      - key: ALLOW_ANONYMOUS_LOGIN
+        value: "yes"
+    disk:
+      name: zk-data
+      mountPath: /var/lib/zookeeper
+      sizeGB: 5
+
+  - type: worker
+    name: elevate-kafka
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/confluentinc/cp-kafka:7.3.0
+    envVars:
+      - key: KAFKA_ZOOKEEPER_CONNECT
+        value: elevate-zookeeper:2181
+      - key: KAFKA_LISTENERS
+        value: PLAINTEXT://0.0.0.0:29092
+      - key: KAFKA_ADVERTISED_LISTENERS
+        value: PLAINTEXT://elevate-kafka:29092
+      - key: KAFKA_INTER_BROKER_LISTENER_NAME
+        value: PLAINTEXT
+      - key: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+        value: "1"
+      - key: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+        value: "1"
+      - key: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+        value: "1"
+    disk:
+      name: kafka-data
+      mountPath: /var/lib/kafka
+      sizeGB: 10
+    dependsOn:
+      - name: elevate-zookeeper
+        condition: ready
+
+  - type: web
+    name: elevate-mailpit
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/axllent/mailpit:v1.20
+
+  - type: web
+    name: elevate-gotenberg
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/gotenberg/gotenberg:latest
+
+  # ---- 3. ELEVATE backend (public shikshalokamqa images + local builds) ----
+  - type: web
+    name: elevate-user
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-user:3.4.0
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: DEV_DATABASE_URL
+        sync: false
+      - key: KAFKA_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+
+  - type: web
+    name: elevate-entity
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-entity-management:3.4
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+
+  - type: web
+    name: elevate-samiksha
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-samiksha-service:3.4.0_RC1
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+
+  - type: web
+    name: elevate-project
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-project-service:3.4.0
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+
+  - type: web
+    name: elevate-scheduler
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-scheduler:3.4.0
+
+  - type: web
+    name: elevate-interface
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-interface:3.3.2
+
+  - type: web
+    name: elevate-mentoring
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/shikshalokamqa/elevate-mentoring:3.4
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: KAFKA_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+
+  # Local builds (not published images).
+  - type: web
+    name: elevate-notification
+    runtime: docker
+    repo: https://github.com/ELEVATE-Project/notification.git
+    dockerfilePath: Dockerfile
+  - type: web
+    name: elevate-sup
+    runtime: docker
+    repo: https://github.com/madakari-nd/ipc-poc
+    dockerfilePath: infra/elevate-sup/Dockerfile
+    branch: 001-ipc-programme-poc
