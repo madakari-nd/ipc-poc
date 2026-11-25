@@ -1,0 +1,42 @@
+# Render gateway Caddyfile. Render fronts this service with its own TLS/HTTPS, so Caddy listens
+# on the internal port and serves on plain HTTP; upstreams are Render private hostnames provided
+# via env vars (EDGE_URL, S3_PUBLIC_URL). Host is passed through for the SigV4 presigned URLs.
+{
+	admin off
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=()"
+		-Server
+	}
+}
+
+:8080 {
+	# Programme Edge (only public API). Internal routes are never proxied.
+	handle /ipc/* {
+		reverse_proxy {$EDGE_URL:http://edge:8080}
+	}
+	# Presigned evidence URLs (path-style, short-lived; scope checked by the edge before issuing).
+	# Path and Host are passed through unchanged so the SigV4 signature still matches.
+	handle /ipc-evidence-* {
+		reverse_proxy {$S3_PUBLIC_URL:https://s3-external} {
+			header_up Host {host}
+		}
+	}
+	handle_path /field/* {
+		root * /srv/field
+		try_files {path} /index.html
+		file_server
+	}
+	handle_path /officer/* {
+		root * /srv/officer
+		try_files {path} /index.html
+		file_server
+	}
+	handle {
+		redir /officer/ 302
+	}
+}

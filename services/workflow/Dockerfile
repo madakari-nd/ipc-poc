@@ -16,4 +16,4 @@ COPY --from=build --chown=node:node /repo /app
 USER node
 EXPOSE 8080 8081
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "services/workflow/dist/server.js"]
+CMD ["sh", "-c", "npm run migrate:up -w @ipc/workflow && node services/workflow/dist/server.js"]
