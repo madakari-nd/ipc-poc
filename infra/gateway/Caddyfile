@@ -3,6 +3,9 @@
 # via env vars (EDGE_URL, S3_PUBLIC_URL). Host is passed through for the SigV4 presigned URLs.
 {
 	admin off
+}
+
+:8080 {
 	encode zstd gzip
 
 	header {
@@ -12,9 +15,7 @@
 		Permissions-Policy "geolocation=(self), camera=(self), microphone=()"
 		-Server
 	}
-}
 
-:8080 {
 	# Programme Edge (only public API). Internal routes are never proxied.
 	handle /ipc/* {
 		reverse_proxy {$EDGE_URL:http://edge:8080}
