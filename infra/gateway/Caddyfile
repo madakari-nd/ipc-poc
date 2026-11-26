@@ -17,8 +17,12 @@
 	}
 
 	# Programme Edge (only public API). Internal routes are never proxied.
+	# Host is set to the edge's own hostname so the edge's origin/host validation accepts it.
 	handle /ipc/* {
-		reverse_proxy {$EDGE_URL:http://edge:8080}
+		reverse_proxy {$EDGE_URL:http://edge:8080} {
+			header_up Host {$EDGE_URL}
+			header_up X-Forwarded-Host {host}
+		}
 	}
 	# Presigned evidence URLs (path-style, short-lived; scope checked by the edge before issuing).
 	# Path and Host are passed through unchanged so the SigV4 signature still matches.
