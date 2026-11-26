@@ -17,10 +17,11 @@
 	}
 
 	# Programme Edge (only public API). Internal routes are never proxied.
-	# Host is set to the edge's own hostname so the edge's origin/host validation accepts it.
+	# Host is set to the upstream's own host so Cloudflare/Render accept the request
+	# (Caddy otherwise preserves the gateway's hostname, which upstreams reject).
 	handle /ipc/* {
 		reverse_proxy {$EDGE_URL:http://edge:8080} {
-			header_up Host {$EDGE_URL}
+			header_up Host {upstream_hostport}
 			header_up X-Forwarded-Host {host}
 		}
 	}
