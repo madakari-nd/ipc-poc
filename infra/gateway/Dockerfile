@@ -12,5 +12,5 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund \
 FROM caddy:2.8.4-alpine
 COPY --from=build /repo/apps/field/dist /srv/field
 COPY --from=build /repo/apps/officer/dist /srv/officer
-COPY infra/gateway/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /repo/infra/gateway/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080

@@ -11,5 +11,7 @@ docs/source/
 .specify/
 .claude/
 infra/
+!infra/gateway/
+!infra/gateway/Caddyfile
 scripts/
 .github/
